@@ -4,6 +4,7 @@ import reactLogo from "./assets/react.svg";
 import viteLogo from "./assets/vite.svg";
 import "./App.css";
 import UserList from "./pages/UserList/UserList";
+import TravelTracker from "./pages/TravelTracker/TravelTracker";
 
 function Home() {
   const [count, setCount] = useState(0);
@@ -76,6 +77,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/user-list" element={<UserList />} />
+        <Route path="/travel-tracker" element={<TravelTracker />} />
       </Routes>
     </Router>
   );

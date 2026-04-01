@@ -6,8 +6,10 @@ import {
   StyledHeader,
   StyledButtonContainer,
   StyledBackButton,
-  StyledUserGrid,
-  StyledUserCard,
+  StyledUserTable,
+  StyledTableHeader,
+  StyledTableRow,
+  StyledTableCell,
   StyledMessage,
   StyledPaginationContainer,
   StyledPaginationButton,
@@ -84,13 +86,26 @@ const UserList: React.FC = () => {
     if (users.length === 0) {
       return <StyledMessage>No users found.</StyledMessage>;
     }
-    return users.map((user) => (
-      <StyledUserCard key={user.id}>
-        <h3>{user.name}</h3>
-        <p>Email: {user.email}</p>
-        <p>ID: {user.id}</p>
-      </StyledUserCard>
-    ));
+    return (
+      <StyledUserTable>
+        <thead>
+          <tr>
+            <StyledTableHeader>ID</StyledTableHeader>
+            <StyledTableHeader>Name</StyledTableHeader>
+            <StyledTableHeader>Email</StyledTableHeader>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((user) => (
+            <StyledTableRow key={user.id}>
+              <StyledTableCell>{user.id}</StyledTableCell>
+              <StyledTableCell>{user.name}</StyledTableCell>
+              <StyledTableCell>{user.email}</StyledTableCell>
+            </StyledTableRow>
+          ))}
+        </tbody>
+      </StyledUserTable>
+    );
   };
 
   return (
@@ -104,7 +119,7 @@ const UserList: React.FC = () => {
         <AddUserModal onAddUser={handleAddUser} />
       </StyledButtonContainer>
 
-      <StyledUserGrid>{renderUserContent()}</StyledUserGrid>
+      {renderUserContent()}
 
       <StyledPaginationContainer>
         <StyledPaginationButton
