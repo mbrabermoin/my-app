@@ -1,0 +1,118 @@
+/* [project]/app/globals.css [app-client] (css) */
+:root {
+  color: #f4f7fb;
+  font-synthesis: none;
+  text-rendering: optimizelegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: radial-gradient(circle at top, #1877f238, #0000 40%), linear-gradient(#0b1320 0%, #101a2e 100%);
+  font-family: Segoe UI, sans-serif;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+.home-shell {
+  place-items: center;
+  min-height: 100vh;
+  padding: 32px 20px;
+  display: grid;
+}
+
+.home-card {
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  background: #080e1ab8;
+  border: 1px solid #ffffff1f;
+  border-radius: 28px;
+  width: min(720px, 100%);
+  padding: 40px;
+  box-shadow: 0 30px 80px #00000047;
+}
+
+.home-eyebrow {
+  color: #85f0e8;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: #4ecdc424;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: .85rem;
+  display: inline-flex;
+}
+
+.home-title {
+  margin: 18px 0 12px;
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  line-height: 1;
+}
+
+.home-copy {
+  color: #f4f7fbb8;
+  max-width: 58ch;
+  margin: 0;
+}
+
+.home-actions {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 28px;
+  display: grid;
+}
+
+.home-action {
+  background: linear-gradient(#ffffff14, #ffffff08);
+  border: 1px solid #ffffff1a;
+  border-radius: 20px;
+  padding: 20px;
+  transition: transform .18s, border-color .18s, background .18s;
+  display: block;
+}
+
+.home-action:hover {
+  background: linear-gradient(#4ecdc429, #ffffff0d);
+  border-color: #4ecdc485;
+  transform: translateY(-2px);
+}
+
+.home-action-title {
+  margin-bottom: 6px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  display: block;
+}
+
+.home-action-copy {
+  color: #f4f7fbb8;
+  display: block;
+}
+
+@media (max-width: 640px) {
+  .home-card {
+    padding: 28px;
+  }
+}
+
+/*# sourceMappingURL=app_globals_0jn8.0u.css.map*/
