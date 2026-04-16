@@ -11,7 +11,7 @@ export const config = {
 };
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Strip the /api/backend prefix so Express routes match correctly
-  req.url = (req.url ?? "/").replace(/^\/api\/backend/, "") || "/";
+  // Strip the /backend-api or /api/backend prefix so Express routes match correctly
+  req.url = (req.url ?? "/").replace(/^\/(backend-api|api\/backend)/, "") || "/";
   return app(req, res);
 }
