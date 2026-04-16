@@ -89,7 +89,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
   return (
     <>
       <StyledAddButton onClick={() => setIsModalOpen(true)}>
-        + Add Expense
+        + Agregar Gasto
       </StyledAddButton>
 
       {/* Modal */}

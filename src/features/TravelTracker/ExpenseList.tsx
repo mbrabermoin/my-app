@@ -6,30 +6,45 @@ import AddExpenseModal from "./components/AddExpenseModal";
 import { useTripsAndExpenses } from "./useTripsAndExpenses";
 import { apiUrl } from "../../lib/api";
 import {
-  StyledContainer,
-  StyledHeader,
-  StyledButtonContainer,
-  StyledBackButton,
-  StyledMessage,
-  StyledPaginationContainer,
-  StyledPaginationButton,
-  StyledPaginationInfo,
+  TravelFonts,
+  StyledPage,
+  StyledPageHeader,
+  StyledHeaderInner,
+  StyledHeaderTop,
+  StyledTitleGroup,
+  StyledHeaderActions,
+  StyledStatsRow,
+  StyledStat,
+  StyledStatLabel,
+  StyledStatValue,
+  StyledStatDivider,
+  StyledFiltersSection,
+  StyledFiltersInner,
+  StyledTripFilterContainer,
+  StyledFilterLabel,
+  StyledChip,
+  StyledMain,
+  StyledTotalsBar,
+  StyledTotalCard,
+  StyledTotalCardLabel,
+  StyledTotalCardValue,
+  StyledTableWrap,
+  StyledExpenseTable,
   StyledTableHeader,
   StyledTableRow,
   StyledTableCell,
-  StyledExpenseTable,
-  StyledSyncButton,
-  StyledTripFilterContainer,
-  StyledTripFilterButton,
-  StyledSummary,
-  StyledSummaryItem,
-  StyledSummaryValue,
-  StyledFilterLabel,
+  StyledAvatarBadge,
   StyledCardList,
   StyledExpenseCard,
   StyledCardRow,
   StyledCardLabel,
   StyledCardValue,
+  StyledBackButton,
+  StyledSyncButton,
+  StyledMessage,
+  StyledPaginationContainer,
+  StyledPaginationButton,
+  StyledPaginationInfo,
 } from "./ExpenseList.styles";
 
 const ExpenseList: React.FC = () => {
@@ -47,79 +62,49 @@ const ExpenseList: React.FC = () => {
 
   const { currentPage, hasNextPage, hasPrevPage } = pagination;
   const [selectedResponsible, setSelectedResponsible] = React.useState<string | null>(null);
+
   const dolarPesosExchange = selectedTrip?.dolarPesosExchange ?? 1;
   const dolarRealExchange = selectedTrip?.dolarRealExchange ?? 1;
-  const round2 = (value: number) => Math.round(value * 100) / 100;
-  const formatDate = (date?: string) => {
-    if (!date) {
-      return "-";
-    }
+  const round2 = (v: number) => Math.round(v * 100) / 100;
 
-    return new Intl.DateTimeFormat("es-AR", {
-      timeZone: "UTC",
-    }).format(new Date(date));
+  const formatDate = (date?: string) => {
+    if (!date) return "-";
+    return new Intl.DateTimeFormat("es-AR", { timeZone: "UTC" }).format(new Date(date));
   };
 
   const formatTripDate = (date?: string | Date) => {
-    if (!date) {
-      return "-";
-    }
-
-    const parsedDate = date instanceof Date ? date : new Date(date);
-
-    if (Number.isNaN(parsedDate.getTime())) {
-      return "-";
-    }
-
-    return parsedDate.toLocaleDateString("es-AR", { timeZone: "UTC" });
+    if (!date) return "-";
+    const d = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(d.getTime())) return "-";
+    return d.toLocaleDateString("es-AR", { timeZone: "UTC" });
   };
 
-  const normalizeExchange = (value: string) =>
-    value
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
+  const normalizeExchange = (v: string) =>
+    v.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
   const getExchange = (exchange: string) => {
-    const normalized = normalizeExchange(exchange);
-
-    if (normalized.startsWith("pes") || normalized.startsWith("ars")) {
-      return "$";
-    }
-
-    if (normalized.startsWith("dol") || normalized.startsWith("usd")) {
-      return "U$D";
-    }
-
-    if (normalized.startsWith("rea") || normalized.startsWith("brl")) {
-      return "R$";
-    }
-
+    const n = normalizeExchange(exchange);
+    if (n.startsWith("pes") || n.startsWith("ars")) return "$";
+    if (n.startsWith("dol") || n.startsWith("usd")) return "U$D";
+    if (n.startsWith("rea") || n.startsWith("brl")) return "R$";
     return "-";
   };
 
-  const getLocalCurrencyAmount = (expense: number, exchange: string) => {
-    const normalized = normalizeExchange(exchange);
-
+  const getLocalCurrencyAmount = (amount: number, exchange: string) => {
+    const n = normalizeExchange(exchange);
     return round2(
-      normalized.startsWith("dol") || normalized.startsWith("usd")
-        ? expense * dolarPesosExchange
-        : normalized.startsWith("rea") || normalized.startsWith("brl")
-        ? expense / dolarRealExchange * dolarPesosExchange
-        : expense,
+      n.startsWith("dol") || n.startsWith("usd") ? amount * dolarPesosExchange
+      : n.startsWith("rea") || n.startsWith("brl") ? (amount / dolarRealExchange) * dolarPesosExchange
+      : amount,
     );
   };
 
-  const getDollarAmount = (expense: number, exchange: string) => {
-    const normalized = normalizeExchange(exchange);
-
+  const getDollarAmount = (amount: number, exchange: string) => {
+    const n = normalizeExchange(exchange);
     return round2(
-      normalized.startsWith("pes") || normalized.startsWith("ars")
-        ? expense / dolarPesosExchange
-        : normalized.startsWith("rea") || normalized.startsWith("brl")
-        ? expense / dolarRealExchange
-        : expense,
+      n.startsWith("pes") || n.startsWith("ars") ? amount / dolarPesosExchange
+      : n.startsWith("rea") || n.startsWith("brl") ? amount / dolarRealExchange
+      : amount,
     );
   };
 
@@ -139,49 +124,70 @@ const ExpenseList: React.FC = () => {
   }));
 
   const totals = expensesWithTotals.reduce(
-    (accumulator, expense) => ({
-      localCurrencyAmount: round2(
-        accumulator.localCurrencyAmount + expense.localCurrencyAmount,
-      ),
-      dollarAmount: round2(accumulator.dollarAmount + expense.dollarAmount),
+    (acc, e) => ({
+      localCurrencyAmount: round2(acc.localCurrencyAmount + e.localCurrencyAmount),
+      dollarAmount: round2(acc.dollarAmount + e.dollarAmount),
     }),
-    {
-      localCurrencyAmount: 0,
-      dollarAmount: 0,
-    },
+    { localCurrencyAmount: 0, dollarAmount: 0 },
   );
 
-  const renderCards = () => {
-    if (loading) return <StyledMessage>Loading expenses...</StyledMessage>;
-    if (expensesWithTotals.length === 0) return <StyledMessage>No expenses found.</StyledMessage>;
+  // Per-person dollar totals for the totals bar
+  const perPerson: Record<string, number> = {};
+  for (const e of expensesWithTotals) {
+    if (e.responsible) {
+      perPerson[e.responsible] = round2((perPerson[e.responsible] ?? 0) + e.dollarAmount);
+    }
+  }
+  const personEntries = Object.entries(perPerson);
+  const maxPayer = personEntries.length
+    ? personEntries.reduce((a, b) => (a[1] > b[1] ? a : b))
+    : null;
+  const minPayer = personEntries.length > 1
+    ? personEntries.reduce((a, b) => (a[1] < b[1] ? a : b))
+    : null;
+  const diff = maxPayer && minPayer ? round2(maxPayer[1] - minPayer[1]) : 0;
 
+  const handleSyncClick = async () => {
+    try {
+      const response = await fetch(apiUrl("/api/admin/sync-sheets"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json();
+      alert(data.success ? data.message : "Error: " + data.message);
+    } catch {
+      alert("Cannot connect with server. Please try again later.");
+    }
+  };
+
+  const renderCards = () => {
     return (
       <StyledCardList>
         {expensesWithTotals.map((expense) => (
           <StyledExpenseCard key={expense.id}>
             <StyledCardRow>
-              <StyledCardLabel>Date</StyledCardLabel>
+              <StyledCardLabel>Fecha</StyledCardLabel>
               <StyledCardValue className="accent">{formatDate(expense.date)}</StyledCardValue>
             </StyledCardRow>
             <StyledCardRow>
-              <StyledCardLabel>Paid By</StyledCardLabel>
+              <StyledCardLabel>Pagó</StyledCardLabel>
               <StyledCardValue>{expense.responsible}</StyledCardValue>
             </StyledCardRow>
             <StyledCardRow style={{ gridColumn: "1 / -1" }}>
-              <StyledCardLabel>Description</StyledCardLabel>
+              <StyledCardLabel>Descripción</StyledCardLabel>
               <StyledCardValue>{expense.type}</StyledCardValue>
             </StyledCardRow>
             <StyledCardRow>
-              <StyledCardLabel>Amount</StyledCardLabel>
+              <StyledCardLabel>Monto</StyledCardLabel>
               <StyledCardValue>{expense.displayExchange} {expense.amount}</StyledCardValue>
             </StyledCardRow>
             <StyledCardRow>
               <StyledCardLabel>Pesos</StyledCardLabel>
-              <StyledCardValue>{"$ " + expense.localCurrencyAmount}</StyledCardValue>
+              <StyledCardValue className="muted">$ {expense.localCurrencyAmount}</StyledCardValue>
             </StyledCardRow>
             <StyledCardRow>
-              <StyledCardLabel>Dollar</StyledCardLabel>
-              <StyledCardValue>{"U$D " + expense.dollarAmount}</StyledCardValue>
+              <StyledCardLabel>USD</StyledCardLabel>
+              <StyledCardValue className="usd">U$D {expense.dollarAmount}</StyledCardValue>
             </StyledCardRow>
           </StyledExpenseCard>
         ))}
@@ -189,173 +195,174 @@ const ExpenseList: React.FC = () => {
     );
   };
 
-  const renderExpenseContent = () => {
-    if (loading) {
-      return (
-        <tbody>
-          <StyledTableRow>
-            <StyledTableCell colSpan={6}>
-              <StyledMessage>Loading expenses...</StyledMessage>
-            </StyledTableCell>
-          </StyledTableRow>
-        </tbody>
-      );
-    }
-
-    if (expenses.length === 0) {
-      return (
-        <tbody>
-          <StyledTableRow>
-            <StyledTableCell colSpan={6}>
-              <StyledMessage>No expenses found.</StyledMessage>
-            </StyledTableCell>
-          </StyledTableRow>
-        </tbody>
-      );
-    }
+  const renderTable = () => {
+    if (loading) return <tbody><tr><td colSpan={6}><StyledMessage>Cargando gastos...</StyledMessage></td></tr></tbody>;
+    if (expensesWithTotals.length === 0) return <tbody><tr><td colSpan={6}><StyledMessage>✈️ No hay gastos para mostrar.</StyledMessage></td></tr></tbody>;
 
     return (
       <tbody>
         {expensesWithTotals.map((expense) => (
           <StyledTableRow key={expense.id}>
-            <StyledTableCell>{formatDate(expense.date)}</StyledTableCell>
-            <StyledTableCell>{expense.type}</StyledTableCell>
-            
-            <StyledTableCell>{expense.responsible}</StyledTableCell>
-            <StyledTableCell>{expense.displayExchange} {expense.amount}</StyledTableCell>
-            <StyledTableCell>{"$ " + expense.localCurrencyAmount}</StyledTableCell>
-            <StyledTableCell>{"U$D " + expense.dollarAmount}</StyledTableCell>
+            <StyledTableCell className="date">{formatDate(expense.date)}</StyledTableCell>
+            <StyledTableCell className="desc">{expense.type}</StyledTableCell>
+            <StyledTableCell className="responsible">
+              <StyledAvatarBadge $name={expense.responsible ?? ""}>
+                {expense.responsible?.[0]?.toUpperCase() ?? "?"}
+              </StyledAvatarBadge>
+              {expense.responsible}
+            </StyledTableCell>
+            <StyledTableCell className="amount">{expense.displayExchange} {expense.amount}</StyledTableCell>
+            <StyledTableCell className="pesos">$ {expense.localCurrencyAmount}</StyledTableCell>
+            <StyledTableCell className="usd">U$D {expense.dollarAmount}</StyledTableCell>
           </StyledTableRow>
         ))}
       </tbody>
     );
   };
 
-  const handleSyncClick = async () => {
-    try {
-        const response = await fetch(apiUrl("/api/admin/sync-sheets"), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            alert(data.message);
-        } else {
-            alert("Error: " + data.message);
-        }
-    } catch {
-        alert("Cannot connect with server. Please try again later.");
-    }
-};
-
   return (
-    <StyledContainer>
-      <StyledHeader>Expense List</StyledHeader>
-      <StyledButtonContainer>
-        <StyledBackButton onClick={() => router.push("/")}>
-          ← Back to Home
-        </StyledBackButton>
-        <StyledSyncButton onClick={() => handleSyncClick()}>
-          Sync with Google Sheets
-        </StyledSyncButton>
-        <AddExpenseModal onAddExpense={handleAddExpense} />
-      </StyledButtonContainer>
+    <StyledPage>
+      <TravelFonts />
 
-      <StyledTripFilterContainer>
-        <StyledTripFilterButton
-          key="all"
-          onClick={() => setSelectedTrip(null)}
-          $active={selectedTrip === null}
-        >
-          All
-        </StyledTripFilterButton>
-        {trips.map((trip) => (
-          <StyledTripFilterButton
-            key={trip.id}
-            onClick={() => setSelectedTrip(trip)}
-            $active={selectedTrip?.id === trip.id}
-          >
-            {trip.destiny}
-          </StyledTripFilterButton>
-        ))}
-      </StyledTripFilterContainer>
+      {/* ── HEADER ── */}
+      <StyledPageHeader>
+        <StyledHeaderInner>
+          <StyledHeaderTop>
+            <StyledTitleGroup>
+              <h1>Gastos de <em>viaje</em></h1>
+              <p>
+                {selectedTrip
+                  ? `${selectedTrip.destiny} · ${formatTripDate(selectedTrip.startDate)} – ${formatTripDate(selectedTrip.endDate)}`
+                  : "Todos los viajes"}
+              </p>
+            </StyledTitleGroup>
+            <StyledHeaderActions>
+              <StyledBackButton onClick={() => router.push("/")}>← Volver</StyledBackButton>
+              <StyledSyncButton onClick={handleSyncClick}>⟳ Sincronizar</StyledSyncButton>
+              <AddExpenseModal onAddExpense={handleAddExpense} />
+            </StyledHeaderActions>
+          </StyledHeaderTop>
 
-      <StyledTripFilterContainer>
-        <StyledFilterLabel>Paid By:</StyledFilterLabel>
-        <StyledTripFilterButton
-          onClick={() => setSelectedResponsible(null)}
-          $active={selectedResponsible === null}
-        >
-          All
-        </StyledTripFilterButton>
-        {responsibles.map((responsible) => (
-          <StyledTripFilterButton
-            key={responsible}
-            onClick={() => setSelectedResponsible(responsible)}
-            $active={selectedResponsible === responsible}
-          >
-            {responsible}
-          </StyledTripFilterButton>
-        ))}
-      </StyledTripFilterContainer>
+          <StyledStatsRow>
+            <StyledStat>
+              <StyledStatLabel>Gastos</StyledStatLabel>
+              <StyledStatValue>{expensesWithTotals.length}</StyledStatValue>
+            </StyledStat>
+            <StyledStatDivider />
+            <StyledStat>
+              <StyledStatLabel>Total USD</StyledStatLabel>
+              <StyledStatValue $accent>U$D {totals.dollarAmount}</StyledStatValue>
+            </StyledStat>
+            <StyledStatDivider />
+            <StyledStat>
+              <StyledStatLabel>Total Pesos</StyledStatLabel>
+              <StyledStatValue>$ {totals.localCurrencyAmount}</StyledStatValue>
+            </StyledStat>
+            {selectedTrip && (
+              <>
+                <StyledStatDivider />
+                <StyledStat>
+                  <StyledStatLabel>Dólar</StyledStatLabel>
+                  <StyledStatValue>$ {selectedTrip.dolarPesosExchange}</StyledStatValue>
+                </StyledStat>
+              </>
+            )}
+          </StyledStatsRow>
+        </StyledHeaderInner>
+      </StyledPageHeader>
 
-      <StyledSummary>
-        <StyledSummaryItem>
-          Total Expenses: <StyledSummaryValue>{expenses.length}</StyledSummaryValue>
-        </StyledSummaryItem>
-        <StyledSummaryItem>
-          Dollar: <StyledSummaryValue>{selectedTrip?.dolarPesosExchange ?? "-"}</StyledSummaryValue>
-        </StyledSummaryItem>
-        <StyledSummaryItem>
-          Total Pesos: <StyledSummaryValue>{"$ " + totals.localCurrencyAmount}</StyledSummaryValue>
-        </StyledSummaryItem>
-        <StyledSummaryItem>
-          Total Dollar: <StyledSummaryValue>{"U$D " + totals.dollarAmount}</StyledSummaryValue>
-        </StyledSummaryItem>
-        <StyledSummaryItem>
-          From: <StyledSummaryValue>{formatTripDate(selectedTrip?.startDate)}</StyledSummaryValue>
-        </StyledSummaryItem>
-        <StyledSummaryItem>
-          To: <StyledSummaryValue>{formatTripDate(selectedTrip?.endDate)}</StyledSummaryValue>
-        </StyledSummaryItem>
-      </StyledSummary>
-      {renderCards()}
-      <StyledExpenseTable>
-        <thead>
-          <tr>
-            <StyledTableHeader>Date</StyledTableHeader>
-            <StyledTableHeader>Description</StyledTableHeader>
-            <StyledTableHeader>Paid By</StyledTableHeader>
-            <StyledTableHeader>Amount</StyledTableHeader>
-            <StyledTableHeader>Pesos</StyledTableHeader>
-            <StyledTableHeader>Dollar</StyledTableHeader>
-          </tr>
-        </thead>
-        {renderExpenseContent()}
-      </StyledExpenseTable>
-      
-      <StyledPaginationContainer>
-        <StyledPaginationButton
-          disabled={!hasPrevPage}
-          onClick={() => loadExpenses(currentPage - 1)}
-        >
-          ← Previous
-        </StyledPaginationButton>
+      {/* ── FILTERS ── */}
+      <StyledFiltersSection>
+        <StyledFiltersInner>
+          <StyledTripFilterContainer>
+            <StyledFilterLabel>Viaje</StyledFilterLabel>
+            <StyledChip $active={selectedTrip === null} onClick={() => setSelectedTrip(null)}>
+              Todos
+            </StyledChip>
+            {trips.map((trip) => (
+              <StyledChip
+                key={trip.id}
+                $active={selectedTrip?.id === trip.id}
+                onClick={() => setSelectedTrip(trip)}
+              >
+                {trip.destiny}
+              </StyledChip>
+            ))}
+          </StyledTripFilterContainer>
 
-        <StyledPaginationInfo>
-           Showing {expenses.length} expenses
-        </StyledPaginationInfo>
+          <StyledTripFilterContainer>
+            <StyledFilterLabel>Pagó</StyledFilterLabel>
+            <StyledChip $active={selectedResponsible === null} $person onClick={() => setSelectedResponsible(null)}>
+              Todos
+            </StyledChip>
+            {responsibles.map((r) => (
+              <StyledChip key={r} $active={selectedResponsible === r} $person onClick={() => setSelectedResponsible(r)}>
+                {r}
+              </StyledChip>
+            ))}
+          </StyledTripFilterContainer>
+        </StyledFiltersInner>
+      </StyledFiltersSection>
 
-        <StyledPaginationButton
-          disabled={!hasNextPage}
-          onClick={() => loadExpenses(currentPage + 1)}
-        >
-          Next →
-        </StyledPaginationButton>
-      </StyledPaginationContainer>
-    </StyledContainer>
+      {/* ── MAIN ── */}
+      <StyledMain>
+        {/* Totals bar */}
+        <StyledTotalsBar>
+          <StyledTotalCard>
+            <StyledTotalCardLabel>Total USD</StyledTotalCardLabel>
+            <StyledTotalCardValue $color="#d4a853">U$D {totals.dollarAmount}</StyledTotalCardValue>
+          </StyledTotalCard>
+          {personEntries.map(([name, usd]) => (
+            <StyledTotalCard key={name}>
+              <StyledTotalCardLabel>{name} pagó</StyledTotalCardLabel>
+              <StyledTotalCardValue $color={name.toLowerCase().startsWith("j") ? "#c4714a" : "#8a9e7e"}>
+                U$D {usd}
+              </StyledTotalCardValue>
+            </StyledTotalCard>
+          ))}
+          {maxPayer && minPayer && (
+            <StyledTotalCard>
+              <StyledTotalCardLabel>Diferencia</StyledTotalCardLabel>
+              <StyledTotalCardValue style={{ fontSize: "14px", lineHeight: "1.4" }}>
+                {minPayer[0]} le debe a {maxPayer[0]}<br />
+                <span style={{ fontSize: "20px", fontWeight: 500 }}>U$D {diff}</span>
+              </StyledTotalCardValue>
+            </StyledTotalCard>
+          )}
+        </StyledTotalsBar>
+
+        {/* Cards (mobile) */}
+        {renderCards()}
+
+        {/* Table (desktop) */}
+        <StyledTableWrap>
+          <StyledExpenseTable>
+            <thead>
+              <tr>
+                <StyledTableHeader>Fecha</StyledTableHeader>
+                <StyledTableHeader>Descripción</StyledTableHeader>
+                <StyledTableHeader>Pagado por</StyledTableHeader>
+                <StyledTableHeader>Monto</StyledTableHeader>
+                <StyledTableHeader>Pesos</StyledTableHeader>
+                <StyledTableHeader>USD</StyledTableHeader>
+              </tr>
+            </thead>
+            {renderTable()}
+          </StyledExpenseTable>
+        </StyledTableWrap>
+
+        {/* Pagination */}
+        <StyledPaginationContainer>
+          <StyledPaginationButton disabled={!hasPrevPage} onClick={() => loadExpenses(currentPage - 1)}>
+            ← Anterior
+          </StyledPaginationButton>
+          <StyledPaginationInfo>Mostrando {expenses.length} gastos</StyledPaginationInfo>
+          <StyledPaginationButton disabled={!hasNextPage} onClick={() => loadExpenses(currentPage + 1)}>
+            Siguiente →
+          </StyledPaginationButton>
+        </StyledPaginationContainer>
+      </StyledMain>
+    </StyledPage>
   );
 };
 

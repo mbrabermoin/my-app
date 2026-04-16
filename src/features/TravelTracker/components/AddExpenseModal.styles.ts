@@ -1,20 +1,31 @@
 import styled from "styled-components";
 
+const terracotta = "#c4714a";
+const deep = "#1a1410";
+const warmBrown = "#6b4226";
+const cream = "#fdf6ec";
+const muted = "#9c8b79";
+const sand = "#f5ede0";
+
 export const StyledAddButton = styled.button`
-  padding: 12px 24px;
-  font-size: 16px;
-  background: linear-gradient(180deg, rgba(78, 205, 196, 0.26), rgba(78, 205, 196, 0.14));
-  color: #f4f7fb;
-  border: 1px solid rgba(78, 205, 196, 0.52);
-  border-radius: 999px;
+  padding: 11px 22px;
+  border-radius: 50px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background: ${terracotta};
+  color: white;
   cursor: pointer;
-  font-weight: 700;
-  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+  transition: all 0.18s;
+  font-family: 'DM Sans', sans-serif;
+  letter-spacing: 0.4px;
 
   &:hover {
-    border-color: rgba(133, 240, 232, 0.8);
-    background: linear-gradient(180deg, rgba(78, 205, 196, 0.36), rgba(78, 205, 196, 0.2));
-    transform: translateY(-2px);
+    background: #b05e39;
+    border-color: rgba(255, 255, 255, 0.22);
+    color: white;
+    box-shadow: 0 8px 24px rgba(196, 113, 74, 0.35);
+    transform: translateY(-1px);
   }
 `;
 
@@ -24,23 +35,25 @@ export const StyledModalOverlay = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(3, 7, 12, 0.72);
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
-  backdrop-filter: blur(8px);
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+  padding: 16px;
 `;
 
 export const StyledModalContent = styled.div`
-  background: rgba(8, 14, 26, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: ${cream};
+  border: 1px solid rgba(0, 0, 0, 0.08);
   padding: 30px;
   border-radius: 20px;
-  width: 450px;
+  width: 480px;
   max-width: 90%;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.28);
   position: relative;
+  color: ${deep};
 
   &::before {
     content: "";
@@ -48,24 +61,26 @@ export const StyledModalContent = styled.div`
     inset: 0;
     border-radius: 20px;
     pointer-events: none;
-    background: radial-gradient(circle at top right, rgba(78, 205, 196, 0.14), transparent 52%);
+    background: radial-gradient(circle at top right, rgba(196, 113, 74, 0.12), transparent 60%);
   }
 `;
 
 export const StyledModalHeader = styled.h2`
   margin-top: 0;
-  margin-bottom: 20px;
-  color: #f4f7fb;
+  margin-bottom: 22px;
+  color: ${deep};
   font-size: 1.8rem;
+  font-family: 'Playfair Display', serif;
+  letter-spacing: -0.4px;
 `;
 
 export const StyledErrorContainer = styled.div`
-  background: rgba(220, 53, 69, 0.12);
-  color: #ff9ea7;
+  background: #fff2ee;
+  color: #9b2f18;
   padding: 12px;
   border-radius: 10px;
   margin-bottom: 15px;
-  border: 1px solid rgba(220, 53, 69, 0.42);
+  border: 1px solid rgba(196, 113, 74, 0.36);
 `;
 
 export const StyledFieldContainer = styled.div<{ marginBottom?: string }>`
@@ -74,59 +89,67 @@ export const StyledFieldContainer = styled.div<{ marginBottom?: string }>`
 
 export const StyledLabel = styled.label`
   display: block;
-  margin-bottom: 8px;
-  font-weight: 600;
-  color: rgba(244, 247, 251, 0.86);
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: ${muted};
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 `;
 
 export const StyledInput = styled.input<{ hasError?: boolean }>`
   width: 100%;
-  padding: 12px;
+  padding: 10px 14px;
   border-radius: 10px;
-  border: 1px solid ${(props) => (props.hasError ? "rgba(220, 53, 69, 0.8)" : "rgba(255, 255, 255, 0.2)")};
-  font-size: 16px;
+  border: 1.5px solid ${(props) => (props.hasError ? "rgba(196, 113, 74, 0.7)" : "rgba(0, 0, 0, 0.12)")};
+  font-size: 14px;
   box-sizing: border-box;
   transition: border-color 0.3s, box-shadow 0.3s;
-  background: rgba(255, 255, 255, 0.05);
-  color: #f4f7fb;
+  background: white;
+  color: ${deep};
 
   &:focus {
     outline: none;
-    border-color: ${(props) => (props.hasError ? "rgba(220, 53, 69, 0.8)" : "rgba(78, 205, 196, 0.72)")};
-    box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.2);
+    border-color: ${(props) => (props.hasError ? "rgba(196, 113, 74, 0.72)" : terracotta)};
+    box-shadow: 0 0 0 3px rgba(196, 113, 74, 0.15);
+  }
+
+  &::placeholder {
+    color: ${muted};
   }
 `;
 
 export const StyledErrorText = styled.span`
-  color: #ff9ea7;
-  font-size: 14px;
+  color: #9b2f18;
+  font-size: 13px;
   font-weight: 500;
 `;
 
 export const StyledButtonContainer = styled.div`
   display: flex;
-  gap: 15px;
+  gap: 10px;
   justify-content: flex-end;
-  margin-top: 20px;
+  margin-top: 24px;
 `;
 
 export const StyledCancelButton = styled.button<{ isLoading?: boolean }>`
-  padding: 12px 24px;
-  font-size: 16px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #f4f7fb;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
+  padding: 11px 22px;
+  font-size: 14px;
+  background: transparent;
+  color: ${warmBrown};
+  border: 1.5px solid rgba(0, 0, 0, 0.15);
+  border-radius: 50px;
   cursor: ${(props) => (props.isLoading ? "not-allowed" : "pointer")};
-  font-weight: 700;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
 
   &:hover {
-    border-color: ${(props) => (props.isLoading ? "rgba(255, 255, 255, 0.16)" : "rgba(78, 205, 196, 0.42)")};
+    border-color: ${(props) => (props.isLoading ? "rgba(0, 0, 0, 0.15)" : terracotta)};
     background: ${(props) =>
       props.isLoading
-        ? "rgba(255, 255, 255, 0.06)"
-        : "linear-gradient(180deg, rgba(78, 205, 196, 0.14), rgba(255, 255, 255, 0.05))"};
+        ? "transparent"
+        : "rgba(196, 113, 74, 0.06)"};
     transform: ${(props) => (props.isLoading ? "none" : "translateY(-2px)")};
   }
 `;
@@ -135,34 +158,35 @@ export const StyledSubmitButton = styled.button<{
   isValid?: boolean;
   isLoading?: boolean;
 }>`
-  padding: 12px 24px;
-  font-size: 16px;
+  padding: 11px 28px;
+  font-size: 14px;
   background: ${(props) =>
     props.isValid && !props.isLoading
-      ? "linear-gradient(180deg, rgba(78, 205, 196, 0.32), rgba(78, 205, 196, 0.2))"
-      : "rgba(255, 255, 255, 0.08)"};
-  color: ${(props) => (props.isValid && !props.isLoading ? "#f4f7fb" : "rgba(244, 247, 251, 0.4)")};
+      ? terracotta
+      : sand};
+  color: ${(props) => (props.isValid && !props.isLoading ? "white" : muted)};
   border: 1px solid
     ${(props) =>
       props.isValid && !props.isLoading
-        ? "rgba(78, 205, 196, 0.62)"
-        : "rgba(255, 255, 255, 0.12)"};
-  border-radius: 999px;
+        ? terracotta
+        : "rgba(0, 0, 0, 0.08)"};
+  border-radius: 50px;
   cursor: ${(props) =>
     props.isValid && !props.isLoading ? "pointer" : "not-allowed"};
-  font-weight: 700;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
 
   &:hover {
     background: ${(props) => {
       if (props.isValid && !props.isLoading)
-        return "linear-gradient(180deg, rgba(78, 205, 196, 0.46), rgba(78, 205, 196, 0.26))";
-      return "rgba(255, 255, 255, 0.08)";
+        return "#b05e39";
+      return sand;
     }};
     border-color: ${(props) =>
       props.isValid && !props.isLoading
-        ? "rgba(133, 240, 232, 0.82)"
-        : "rgba(255, 255, 255, 0.12)"};
+        ? "#b05e39"
+        : "rgba(0, 0, 0, 0.08)"};
     transform: ${(props) =>
       props.isValid && !props.isLoading ? "translateY(-2px)" : "none"};
   }
