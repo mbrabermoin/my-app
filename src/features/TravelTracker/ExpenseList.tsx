@@ -25,6 +25,11 @@ import {
   StyledSummaryItem,
   StyledSummaryValue,
   StyledFilterLabel,
+  StyledCardList,
+  StyledExpenseCard,
+  StyledCardRow,
+  StyledCardLabel,
+  StyledCardValue,
 } from "./ExpenseList.styles";
 
 const ExpenseList: React.FC = () => {
@@ -145,6 +150,44 @@ const ExpenseList: React.FC = () => {
       dollarAmount: 0,
     },
   );
+
+  const renderCards = () => {
+    if (loading) return <StyledMessage>Loading expenses...</StyledMessage>;
+    if (expensesWithTotals.length === 0) return <StyledMessage>No expenses found.</StyledMessage>;
+
+    return (
+      <StyledCardList>
+        {expensesWithTotals.map((expense) => (
+          <StyledExpenseCard key={expense.id}>
+            <StyledCardRow>
+              <StyledCardLabel>Date</StyledCardLabel>
+              <StyledCardValue className="accent">{formatDate(expense.date)}</StyledCardValue>
+            </StyledCardRow>
+            <StyledCardRow>
+              <StyledCardLabel>Paid By</StyledCardLabel>
+              <StyledCardValue>{expense.responsible}</StyledCardValue>
+            </StyledCardRow>
+            <StyledCardRow style={{ gridColumn: "1 / -1" }}>
+              <StyledCardLabel>Description</StyledCardLabel>
+              <StyledCardValue>{expense.type}</StyledCardValue>
+            </StyledCardRow>
+            <StyledCardRow>
+              <StyledCardLabel>Amount</StyledCardLabel>
+              <StyledCardValue>{expense.displayExchange} {expense.amount}</StyledCardValue>
+            </StyledCardRow>
+            <StyledCardRow>
+              <StyledCardLabel>Pesos</StyledCardLabel>
+              <StyledCardValue>{"$ " + expense.localCurrencyAmount}</StyledCardValue>
+            </StyledCardRow>
+            <StyledCardRow>
+              <StyledCardLabel>Dollar</StyledCardLabel>
+              <StyledCardValue>{"U$D " + expense.dollarAmount}</StyledCardValue>
+            </StyledCardRow>
+          </StyledExpenseCard>
+        ))}
+      </StyledCardList>
+    );
+  };
 
   const renderExpenseContent = () => {
     if (loading) {
@@ -278,6 +321,7 @@ const ExpenseList: React.FC = () => {
           To: <StyledSummaryValue>{formatTripDate(selectedTrip?.endDate)}</StyledSummaryValue>
         </StyledSummaryItem>
       </StyledSummary>
+      {renderCards()}
       <StyledExpenseTable>
         <thead>
           <tr>
