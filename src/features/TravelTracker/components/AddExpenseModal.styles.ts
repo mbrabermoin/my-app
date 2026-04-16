@@ -3,16 +3,17 @@ import styled from "styled-components";
 export const StyledAddButton = styled.button`
   padding: 12px 24px;
   font-size: 16px;
-  background: linear-gradient(45deg, #ff6b6b, #ffa500);
-  color: white;
-  border: none;
-  border-radius: 25px;
+  background: linear-gradient(180deg, rgba(78, 205, 196, 0.26), rgba(78, 205, 196, 0.14));
+  color: #f4f7fb;
+  border: 1px solid rgba(78, 205, 196, 0.52);
+  border-radius: 999px;
   cursor: pointer;
-  font-weight: bold;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  font-weight: 700;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
 
   &:hover {
-    background: linear-gradient(45deg, #ff5252, #ff8c00);
+    border-color: rgba(133, 240, 232, 0.8);
+    background: linear-gradient(180deg, rgba(78, 205, 196, 0.36), rgba(78, 205, 196, 0.2));
     transform: translateY(-2px);
   }
 `;
@@ -23,50 +24,48 @@ export const StyledModalOverlay = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: rgba(3, 7, 12, 0.72);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(8px);
 `;
 
 export const StyledModalContent = styled.div`
-  background: linear-gradient(145deg, #ffffff, #f0f0f0);
+  background: rgba(8, 14, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   padding: 30px;
   border-radius: 20px;
   width: 450px;
   max-width: 90%;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
   position: relative;
 
   &::before {
-    content: "🌍";
+    content: "";
     position: absolute;
-    top: 10px;
-    right: 20px;
-    font-size: 2rem;
-    opacity: 0.8;
+    inset: 0;
+    border-radius: 20px;
+    pointer-events: none;
+    background: radial-gradient(circle at top right, rgba(78, 205, 196, 0.14), transparent 52%);
   }
 `;
 
 export const StyledModalHeader = styled.h2`
   margin-top: 0;
   margin-bottom: 20px;
-  text-align: center;
-  color: #4a90e2;
+  color: #f4f7fb;
   font-size: 1.8rem;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 `;
 
 export const StyledErrorContainer = styled.div`
-  background: linear-gradient(45deg, #ff9a9e, #fecfef);
-  color: #721c24;
+  background: rgba(220, 53, 69, 0.12);
+  color: #ff9ea7;
   padding: 12px;
   border-radius: 10px;
   margin-bottom: 15px;
-  border: 1px solid #f5c6cb;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(220, 53, 69, 0.42);
 `;
 
 export const StyledFieldContainer = styled.div<{ marginBottom?: string }>`
@@ -77,27 +76,29 @@ export const StyledLabel = styled.label`
   display: block;
   margin-bottom: 8px;
   font-weight: 600;
-  color: #333;
+  color: rgba(244, 247, 251, 0.86);
 `;
 
 export const StyledInput = styled.input<{ hasError?: boolean }>`
   width: 100%;
   padding: 12px;
   border-radius: 10px;
-  border: 2px solid ${(props) => (props.hasError ? "#e74c3c" : "#ddd")};
+  border: 1px solid ${(props) => (props.hasError ? "rgba(220, 53, 69, 0.8)" : "rgba(255, 255, 255, 0.2)")};
   font-size: 16px;
   box-sizing: border-box;
-  transition: border-color 0.3s;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f4f7fb;
 
   &:focus {
     outline: none;
-    border-color: ${(props) => (props.hasError ? "#e74c3c" : "#4ecdc4")};
-    box-shadow: 0 0 5px rgba(78, 205, 196, 0.5);
+    border-color: ${(props) => (props.hasError ? "rgba(220, 53, 69, 0.8)" : "rgba(78, 205, 196, 0.72)")};
+    box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.2);
   }
 `;
 
 export const StyledErrorText = styled.span`
-  color: #e74c3c;
+  color: #ff9ea7;
   font-size: 14px;
   font-weight: 500;
 `;
@@ -112,16 +113,20 @@ export const StyledButtonContainer = styled.div`
 export const StyledCancelButton = styled.button<{ isLoading?: boolean }>`
   padding: 12px 24px;
   font-size: 16px;
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 25px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f4f7fb;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
   cursor: ${(props) => (props.isLoading ? "not-allowed" : "pointer")};
-  font-weight: bold;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  font-weight: 700;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
 
   &:hover {
-    background-color: ${(props) => (props.isLoading ? "#6c757d" : "#5a6268")};
+    border-color: ${(props) => (props.isLoading ? "rgba(255, 255, 255, 0.16)" : "rgba(78, 205, 196, 0.42)")};
+    background: ${(props) =>
+      props.isLoading
+        ? "rgba(255, 255, 255, 0.06)"
+        : "linear-gradient(180deg, rgba(78, 205, 196, 0.14), rgba(255, 255, 255, 0.05))"};
     transform: ${(props) => (props.isLoading ? "none" : "translateY(-2px)")};
   }
 `;
@@ -134,22 +139,30 @@ export const StyledSubmitButton = styled.button<{
   font-size: 16px;
   background: ${(props) =>
     props.isValid && !props.isLoading
-      ? "linear-gradient(45deg, #4ecdc4, #44a08d)"
-      : "#ccc"};
-  color: white;
-  border: none;
-  border-radius: 25px;
+      ? "linear-gradient(180deg, rgba(78, 205, 196, 0.32), rgba(78, 205, 196, 0.2))"
+      : "rgba(255, 255, 255, 0.08)"};
+  color: ${(props) => (props.isValid && !props.isLoading ? "#f4f7fb" : "rgba(244, 247, 251, 0.4)")};
+  border: 1px solid
+    ${(props) =>
+      props.isValid && !props.isLoading
+        ? "rgba(78, 205, 196, 0.62)"
+        : "rgba(255, 255, 255, 0.12)"};
+  border-radius: 999px;
   cursor: ${(props) =>
     props.isValid && !props.isLoading ? "pointer" : "not-allowed"};
-  font-weight: bold;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  font-weight: 700;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
 
   &:hover {
     background: ${(props) => {
       if (props.isValid && !props.isLoading)
-        return "linear-gradient(45deg, #26d0ce, #3a8f7a)";
-      return "#ccc";
+        return "linear-gradient(180deg, rgba(78, 205, 196, 0.46), rgba(78, 205, 196, 0.26))";
+      return "rgba(255, 255, 255, 0.08)";
     }};
+    border-color: ${(props) =>
+      props.isValid && !props.isLoading
+        ? "rgba(133, 240, 232, 0.82)"
+        : "rgba(255, 255, 255, 0.12)"};
     transform: ${(props) =>
       props.isValid && !props.isLoading ? "translateY(-2px)" : "none"};
   }

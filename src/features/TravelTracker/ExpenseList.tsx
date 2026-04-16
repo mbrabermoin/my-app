@@ -19,6 +19,12 @@ import {
   StyledTableCell,
   StyledExpenseTable,
   StyledSyncButton,
+  StyledTripFilterContainer,
+  StyledTripFilterButton,
+  StyledSummary,
+  StyledSummaryItem,
+  StyledSummaryValue,
+  StyledFilterLabel,
 } from "./ExpenseList.styles";
 
 const ExpenseList: React.FC = () => {
@@ -35,7 +41,9 @@ const ExpenseList: React.FC = () => {
   } = useTripsAndExpenses();
 
   const { currentPage, hasNextPage, hasPrevPage } = pagination;
-  const dollarExchange = selectedTrip?.dolarExchange ?? 1;
+  const [selectedResponsible, setSelectedResponsible] = React.useState<string | null>(null);
+  const dolarPesosExchange = selectedTrip?.dolarPesosExchange ?? 1;
+  const dolarRealExchange = selectedTrip?.dolarRealExchange ?? 1;
   const round2 = (value: number) => Math.round(value * 100) / 100;
   const formatDate = (date?: string) => {
     if (!date) {
@@ -45,6 +53,20 @@ const ExpenseList: React.FC = () => {
     return new Intl.DateTimeFormat("es-AR", {
       timeZone: "UTC",
     }).format(new Date(date));
+  };
+
+  const formatTripDate = (date?: string | Date) => {
+    if (!date) {
+      return "-";
+    }
+
+    const parsedDate = date instanceof Date ? date : new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "-";
+    }
+
+    return parsedDate.toLocaleDateString("es-AR", { timeZone: "UTC" });
   };
 
   const normalizeExchange = (value: string) =>
@@ -77,7 +99,9 @@ const ExpenseList: React.FC = () => {
 
     return round2(
       normalized.startsWith("dol") || normalized.startsWith("usd")
-        ? expense * dollarExchange
+        ? expense * dolarPesosExchange
+        : normalized.startsWith("rea") || normalized.startsWith("brl")
+        ? expense / dolarRealExchange * dolarPesosExchange
         : expense,
     );
   };
@@ -87,17 +111,47 @@ const ExpenseList: React.FC = () => {
 
     return round2(
       normalized.startsWith("pes") || normalized.startsWith("ars")
-        ? expense / dollarExchange
+        ? expense / dolarPesosExchange
+        : normalized.startsWith("rea") || normalized.startsWith("brl")
+        ? expense / dolarRealExchange
         : expense,
     );
   };
+
+  const responsibles = Array.from(
+    new Set(expenses.map((e) => e.responsible).filter(Boolean)),
+  ).sort();
+
+  const filteredExpenses = selectedResponsible
+    ? expenses.filter((e) => e.responsible === selectedResponsible)
+    : expenses;
+
+  const expensesWithTotals = filteredExpenses.map((expense) => ({
+    ...expense,
+    displayExchange: getExchange(expense.exchange),
+    localCurrencyAmount: getLocalCurrencyAmount(expense.amount, expense.exchange),
+    dollarAmount: getDollarAmount(expense.amount, expense.exchange),
+  }));
+
+  const totals = expensesWithTotals.reduce(
+    (accumulator, expense) => ({
+      localCurrencyAmount: round2(
+        accumulator.localCurrencyAmount + expense.localCurrencyAmount,
+      ),
+      dollarAmount: round2(accumulator.dollarAmount + expense.dollarAmount),
+    }),
+    {
+      localCurrencyAmount: 0,
+      dollarAmount: 0,
+    },
+  );
 
   const renderExpenseContent = () => {
     if (loading) {
       return (
         <tbody>
           <StyledTableRow>
-            <StyledTableCell colSpan={5}>
+            <StyledTableCell colSpan={6}>
               <StyledMessage>Loading expenses...</StyledMessage>
             </StyledTableCell>
           </StyledTableRow>
@@ -109,7 +163,7 @@ const ExpenseList: React.FC = () => {
       return (
         <tbody>
           <StyledTableRow>
-            <StyledTableCell colSpan={5}>
+            <StyledTableCell colSpan={6}>
               <StyledMessage>No expenses found.</StyledMessage>
             </StyledTableCell>
           </StyledTableRow>
@@ -119,13 +173,15 @@ const ExpenseList: React.FC = () => {
 
     return (
       <tbody>
-        {expenses.map((expense) => (
+        {expensesWithTotals.map((expense) => (
           <StyledTableRow key={expense.id}>
             <StyledTableCell>{formatDate(expense.date)}</StyledTableCell>
             <StyledTableCell>{expense.type}</StyledTableCell>
-            <StyledTableCell>{getExchange(expense.exchange)} {expense.amount}</StyledTableCell>
-            <StyledTableCell>{"$ " + getLocalCurrencyAmount(expense.amount, expense.exchange)}</StyledTableCell>
-            <StyledTableCell>{"U$D " + getDollarAmount(expense.amount, expense.exchange)}</StyledTableCell>
+            
+            <StyledTableCell>{expense.responsible}</StyledTableCell>
+            <StyledTableCell>{expense.displayExchange} {expense.amount}</StyledTableCell>
+            <StyledTableCell>{"$ " + expense.localCurrencyAmount}</StyledTableCell>
+            <StyledTableCell>{"U$D " + expense.dollarAmount}</StyledTableCell>
           </StyledTableRow>
         ))}
       </tbody>
@@ -158,54 +214,78 @@ const ExpenseList: React.FC = () => {
         <StyledBackButton onClick={() => router.push("/")}>
           ← Back to Home
         </StyledBackButton>
-        <AddExpenseModal onAddExpense={handleAddExpense} />
         <StyledSyncButton onClick={() => handleSyncClick()}>
           Sync with Google Sheets
         </StyledSyncButton>
+        <AddExpenseModal onAddExpense={handleAddExpense} />
       </StyledButtonContainer>
 
-      <div style={{ marginBottom: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-        <button
+      <StyledTripFilterContainer>
+        <StyledTripFilterButton
           key="all"
           onClick={() => setSelectedTrip(null)}
-          style={{
-            padding: "8px 16px",
-            backgroundColor: selectedTrip === null ? "#4ecdc4" : "#f0f0f0",
-            color: selectedTrip === null ? "white" : "#333",
-            border: "none",
-            borderRadius: "20px",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
+          $active={selectedTrip === null}
         >
           All
-        </button>
+        </StyledTripFilterButton>
         {trips.map((trip) => (
-          <button
+          <StyledTripFilterButton
             key={trip.id}
             onClick={() => setSelectedTrip(trip)}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: selectedTrip?.id === trip.id ? "#4ecdc4" : "#f0f0f0",
-              color: selectedTrip?.id === trip.id ? "white" : "#333",
-              border: "none",
-              borderRadius: "20px",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
+            $active={selectedTrip?.id === trip.id}
           >
             {trip.destiny}
-          </button>
+          </StyledTripFilterButton>
         ))}
-      </div>
-      <StyledHeader>Total Expenses: {expenses.length} - Dollar: {selectedTrip?.dolarExchange ?? "-"}</StyledHeader>
+      </StyledTripFilterContainer>
+
+      <StyledTripFilterContainer>
+        <StyledFilterLabel>Paid By:</StyledFilterLabel>
+        <StyledTripFilterButton
+          onClick={() => setSelectedResponsible(null)}
+          $active={selectedResponsible === null}
+        >
+          All
+        </StyledTripFilterButton>
+        {responsibles.map((responsible) => (
+          <StyledTripFilterButton
+            key={responsible}
+            onClick={() => setSelectedResponsible(responsible)}
+            $active={selectedResponsible === responsible}
+          >
+            {responsible}
+          </StyledTripFilterButton>
+        ))}
+      </StyledTripFilterContainer>
+
+      <StyledSummary>
+        <StyledSummaryItem>
+          Total Expenses: <StyledSummaryValue>{expenses.length}</StyledSummaryValue>
+        </StyledSummaryItem>
+        <StyledSummaryItem>
+          Dollar: <StyledSummaryValue>{selectedTrip?.dolarPesosExchange ?? "-"}</StyledSummaryValue>
+        </StyledSummaryItem>
+        <StyledSummaryItem>
+          Total Pesos: <StyledSummaryValue>{"$ " + totals.localCurrencyAmount}</StyledSummaryValue>
+        </StyledSummaryItem>
+        <StyledSummaryItem>
+          Total Dollar: <StyledSummaryValue>{"U$D " + totals.dollarAmount}</StyledSummaryValue>
+        </StyledSummaryItem>
+        <StyledSummaryItem>
+          From: <StyledSummaryValue>{formatTripDate(selectedTrip?.startDate)}</StyledSummaryValue>
+        </StyledSummaryItem>
+        <StyledSummaryItem>
+          To: <StyledSummaryValue>{formatTripDate(selectedTrip?.endDate)}</StyledSummaryValue>
+        </StyledSummaryItem>
+      </StyledSummary>
       <StyledExpenseTable>
         <thead>
           <tr>
             <StyledTableHeader>Date</StyledTableHeader>
             <StyledTableHeader>Description</StyledTableHeader>
+            <StyledTableHeader>Paid By</StyledTableHeader>
             <StyledTableHeader>Amount</StyledTableHeader>
-            <StyledTableHeader>Local Currency</StyledTableHeader>
+            <StyledTableHeader>Pesos</StyledTableHeader>
             <StyledTableHeader>Dollar</StyledTableHeader>
           </tr>
         </thead>

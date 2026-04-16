@@ -4,9 +4,11 @@ import { apiUrl } from "../../lib/api";
 interface Trip {
   id: number;
   destiny: string;
-  month: string;
-  year: number;
-  dolarExchange: number;
+  dolarRealExchange: number;
+  dolarPesosExchange: number;
+  startDate: string | Date;
+  endDate: string | Date;
+  paidBy: string;
 }
 
 interface Expense {
@@ -17,6 +19,7 @@ interface Expense {
   category: string;
   tripDescription: string;
   exchange: string;
+  responsible: string;
 }
 
 interface PaginationParams {
