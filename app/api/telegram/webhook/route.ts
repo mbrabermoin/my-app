@@ -21,6 +21,79 @@ async function sendTelegramMessage(chatId: number | string, text: string) {
   }).catch((err) => console.error("[Telegram] sendMessage failed:", err));
 }
 
+function getConfiguredAppsScriptUrl() {
+  const candidates = [
+    "GOOGLE_APPS_SCRIPT_URL",
+    "APPS_SCRIPT_URL",
+    "GAS_WEBAPP_URL",
+  ] as const;
+
+  for (const key of candidates) {
+    const value = process.env[key];
+    if (typeof value === "string" && value.trim()) {
+      return { url: value.trim(), envKey: key };
+    }
+  }
+
+  return { url: null, envKey: null };
+}
+
+async function syncExpenseToGoogleSheet(payload: {
+  date: string;
+  description: string;
+  exchange: string;
+  amount: number;
+  paidBy: string;
+  paymentMethod?: string | null;
+  notes?: string | null;
+}) {
+  const { url } = getConfiguredAppsScriptUrl();
+  if (!url) {
+    return {
+      ok: false,
+      message: "GOOGLE_APPS_SCRIPT_URL no configurada",
+    };
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      redirect: "follow",
+    });
+
+    const text = await response.text();
+    let json: unknown = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        message: `Apps Script HTTP ${response.status}${text ? `: ${String(text).slice(0, 180)}` : ""}`,
+      };
+    }
+
+    if (json && typeof json === "object" && "error" in json && (json as { error?: string }).error) {
+      return {
+        ok: false,
+        message: (json as { error: string }).error,
+      };
+    }
+
+    return { ok: true, message: "OK" };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Error desconocido",
+    };
+  }
+}
+
 // ─── Command handlers ────────────────────────────────────────────────────────
 
 const HELP_TEXT = `<b>Comandos disponibles:</b>
@@ -40,7 +113,7 @@ Agrega un gasto al viaje activo.
 async function handleGastoCommand(
   pool: Pool,
   chatId: number | string,
-  fromName: string,
+  _fromName: string,
   args: string[],
 ) {
   // args: [monto, descripcion, quienPago, moneda, viajeId?]
@@ -100,10 +173,25 @@ async function handleGastoCommand(
     [descripcion.trim(), amount, quienPago.trim(), exchange, travelId, tripName],
   );
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const sheetSync = await syncExpenseToGoogleSheet({
+    date: todayIso,
+    description: descripcion.trim(),
+    exchange,
+    amount,
+    paidBy: quienPago.trim(),
+    paymentMethod: null,
+    notes: `Cargado por Telegram (${tripName})`,
+  });
+
   const expenseId: number = result.rows[0].id;
+  const syncLine = sheetSync.ok
+    ? "📄 Sync Sheet: OK"
+    : `⚠️ Sync Sheet falló: ${sheetSync.message}`;
+
   await sendTelegramMessage(
     chatId,
-    `✅ <b>Gasto agregado</b> (#${expenseId})\n\n📝 ${descripcion}\n💰 ${amount.toFixed(2)} ${exchange}\n👤 ${quienPago}\n✈️ ${tripName}`,
+    `✅ <b>Gasto agregado</b> (#${expenseId})\n\n📝 ${descripcion}\n💰 ${amount.toFixed(2)} ${exchange}\n👤 ${quienPago}\n✈️ ${tripName}\n${syncLine}`,
   );
 }
 
