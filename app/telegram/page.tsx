@@ -23,7 +23,7 @@ export default function TelegramPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const res = await fetch(apiUrl("/telegram/messages"));
+      const res = await fetch(apiUrl("/api/telegram/messages"));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setMessages(json.data?.messages ?? []);
