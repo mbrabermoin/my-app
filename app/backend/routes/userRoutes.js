@@ -10,6 +10,7 @@ const {
   createUser,
   testConnection,
   getTelegramMessages,
+  addExpenseToSheet,
 } = require("../controllers/userController");
 
 console.log("[ROUTES] imported handlers", {
@@ -219,5 +220,7 @@ router.get("/expenses", getExpenses);
 router.get("/trips", getTrips);
 
 router.get("/telegram/messages", getTelegramMessages);
+
+router.post("/expenses/sheet", addExpenseToSheet);
 
 module.exports = router;

@@ -316,6 +316,36 @@ const testConnection = async (req, res) => {
   }
 };
 
+const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL;
+
+const addExpenseToSheet = async (req, res) => {
+  try {
+    const { fecha, descripcion, cambio, monto, responsable, medioPago, notas } = req.body;
+    if (!fecha || !descripcion || !monto || !responsable) {
+      return sendValidationError(res, ["fecha, descripcion, monto y responsable son requeridos"]);
+    }
+    if (!APPS_SCRIPT_URL) {
+      return sendError(res, "GOOGLE_APPS_SCRIPT_URL no configurado", 500);
+    }
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fecha, descripcion, cambio, monto, responsable, medioPago, notas }),
+      redirect: "follow",
+    });
+    const text = await response.text();
+    let json;
+    try { json = JSON.parse(text); } catch { json = { raw: text }; }
+    if (!response.ok || json.error) {
+      return sendError(res, json.error ?? "Error en Apps Script", 502);
+    }
+    return sendSuccess(res, json, "Gasto agregado a la planilla");
+  } catch (error) {
+    console.error("[addExpenseToSheet] error:", error.message);
+    return sendError(res, "Error al agregar gasto", 500);
+  }
+};
+
 const getTelegramMessages = async (req, res) => {
   try {
     const result = await pool.query(
@@ -338,4 +368,5 @@ module.exports = {
   createUser,
   testConnection,
   getTelegramMessages,
+  addExpenseToSheet,
 };

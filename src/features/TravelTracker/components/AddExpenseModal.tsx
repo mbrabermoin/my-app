@@ -25,10 +25,13 @@ interface Expense {
 }
 
 interface FormData {
-  type: string;
-  amount: number;
   date: string;
-  category: string;
+  description: string;
+  exchange: string;
+  amount: string;
+  paidBy: string;
+  paymentMethod: string;
+  notes: string;
 }
 
 interface AddExpenseModalProps {
@@ -39,6 +42,9 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const todayDate = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
 
   const {
     register,
@@ -47,6 +53,9 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
     formState: { errors, isValid },
   } = useForm<FormData>({
     mode: "onChange",
+    defaultValues: {
+      date: todayDate,
+    },
   });
 
   const onSubmit = async (data: FormData) => {
@@ -54,11 +63,9 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
     setError("");
 
     try {
-      const response = await fetch(apiUrl("/api/expenses"), {
+      const response = await fetch(apiUrl("/api/expenses/sheet"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
 
@@ -67,14 +74,11 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
       }
 
       const result = await response.json();
-
-      const newExpense = result.data || result;
-
-      onAddExpense(newExpense);
+      onAddExpense(result.data || result);
       reset();
       setIsModalOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error creating expense");
+      setError(err instanceof Error ? err.message : "Error al agregar gasto");
     } finally {
       setIsLoading(false);
     }
@@ -92,81 +96,106 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
         + Agregar Gasto
       </StyledAddButton>
 
-      {/* Modal */}
       {isModalOpen && (
         <StyledModalOverlay>
           <StyledModalContent>
-            <StyledModalHeader>Add New Expense</StyledModalHeader>
+            <StyledModalHeader>Agregar Gasto</StyledModalHeader>
 
             {error && <StyledErrorContainer>{error}</StyledErrorContainer>}
 
             <form onSubmit={handleSubmit(onSubmit)}>
               <StyledFieldContainer>
-                <StyledLabel>Description:</StyledLabel>
+                <StyledLabel>Fecha:</StyledLabel>
                 <StyledInput
-                  type="text"
-                  hasError={!!errors.type}
-                  {...register("type", {
-                    required: "Description is required",
-                    minLength: {
-                      value: 2,
-                      message: "Description must be at least 2 characters",
-                    },
-                  })}
-                  placeholder="Enter description"
+                  type="date"
+                  hasError={!!errors.date}
+                  {...register("date", { required: "La fecha es requerida" })}
                 />
-                {errors.type && (
-                  <StyledErrorText>{errors.type.message}</StyledErrorText>
-                )}
+                {errors.date && <StyledErrorText>{errors.date.message}</StyledErrorText>}
               </StyledFieldContainer>
 
               <StyledFieldContainer>
-                <StyledLabel>Amount:</StyledLabel>
+                <StyledLabel>Descripción:</StyledLabel>
+                <StyledInput
+                  type="text"
+                  hasError={!!errors.description}
+                  {...register("description", { required: "La descripción es requerida", minLength: { value: 2, message: "Mínimo 2 caracteres" } })}
+                  placeholder="Ej: Almuerzo, Hotel..."
+                />
+                {errors.description && <StyledErrorText>{errors.description.message}</StyledErrorText>}
+              </StyledFieldContainer>
+
+              <StyledFieldContainer>
+                <StyledLabel>Monto (separado por .) :</StyledLabel>
                 <StyledInput
                   type="number"
                   step="0.01"
                   hasError={!!errors.amount}
-                  {...register("amount", {
-                    required: "Amount is required",
-                    min: {
-                      value: 0.01,
-                      message: "Amount must be greater than 0",
-                    },
-                  })}
-                  placeholder="Enter amount"
+                  {...register("amount", { required: "El monto es requerido", min: { value: 0.01, message: "Debe ser mayor a 0" } })}
+                  placeholder="0.00"
                 />
-                {errors.amount && (
-                  <StyledErrorText>{errors.amount.message}</StyledErrorText>
-                )}
+                {errors.amount && <StyledErrorText>{errors.amount.message}</StyledErrorText>}
               </StyledFieldContainer>
 
               <StyledFieldContainer>
-                <StyledLabel>Date:</StyledLabel>
+                <StyledLabel>Cambio:</StyledLabel>
                 <StyledInput
-                  type="date"
-                  hasError={!!errors.date}
-                  {...register("date", {
-                    required: "Date is required",
-                  })}
-                />
-                {errors.date && (
-                  <StyledErrorText>{errors.date.message}</StyledErrorText>
-                )}
+                  as="select"
+                  hasError={!!errors.exchange}
+                  {...register("exchange", { required: "El cambio es requerido" })}
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    Seleccionar moneda
+                  </option>
+                  <option value="Pesos">Pesos</option>
+                  <option value="Real">Real</option>
+                  <option value="Dólar">Dólar</option>
+                </StyledInput>
+                {errors.exchange && <StyledErrorText>{errors.exchange.message}</StyledErrorText>}
+              </StyledFieldContainer>
+
+              <StyledFieldContainer>
+                <StyledLabel>Responsable:</StyledLabel>
+                <StyledInput
+                  as="select"
+                  hasError={!!errors.paidBy}
+                  {...register("paidBy", { required: "El responsable es requerido" })}
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    Seleccionar responsable
+                  </option>
+                  <option value="Mati">Mati</option>
+                  <option value="Juli">Juli</option>
+                  <option value="Otro">Otro</option>
+                </StyledInput>
+                {errors.paidBy && <StyledErrorText>{errors.paidBy.message}</StyledErrorText>}
+              </StyledFieldContainer>
+
+              <StyledFieldContainer>
+                <StyledLabel>Medio de pago:</StyledLabel>
+                <StyledInput
+                  as="select"
+                  hasError={!!errors.paymentMethod}
+                  {...register("paymentMethod")}
+                  defaultValue=""
+                >
+                  <option value="">Seleccionar medio de pago (opcional)</option>
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Tarjeta">Tarjeta</option>
+                  <option value="Pix">Pix</option>
+                </StyledInput>
               </StyledFieldContainer>
 
               <StyledFieldContainer marginBottom="20px">
-                <StyledLabel>Category:</StyledLabel>
+                <StyledLabel>Notas:</StyledLabel>
                 <StyledInput
                   type="text"
-                  hasError={!!errors.category}
-                  {...register("category", {
-                    required: "Category is required",
-                  })}
-                  placeholder="Enter category"
+                  hasError={!!errors.notes}
+                  {...register("notes")}
+                  placeholder="Opcional..."
                 />
-                {errors.category && (
-                  <StyledErrorText>{errors.category.message}</StyledErrorText>
-                )}
               </StyledFieldContainer>
 
               <StyledButtonContainer>
@@ -176,7 +205,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
                   disabled={isLoading}
                   isLoading={isLoading}
                 >
-                  Cancel
+                  Cancelar
                 </StyledCancelButton>
                 <StyledSubmitButton
                   type="submit"
@@ -184,7 +213,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
                   isValid={isValid}
                   isLoading={isLoading}
                 >
-                  {isLoading ? "Creating..." : "Add"}
+                  {isLoading ? "Guardando..." : "Agregar"}
                 </StyledSubmitButton>
               </StyledButtonContainer>
             </form>
