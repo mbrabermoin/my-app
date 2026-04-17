@@ -70,7 +70,14 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
       });
 
       if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
+        let errorMessage = `Error: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData?.message || errorData?.error || errorMessage;
+        } catch {
+          // keep default status message when response is not JSON
+        }
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -178,14 +185,17 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
                 <StyledInput
                   as="select"
                   hasError={!!errors.paymentMethod}
-                  {...register("paymentMethod")}
+                  {...register("paymentMethod", { required: "El medio de pago es requerido" })}
                   defaultValue=""
                 >
-                  <option value="">Seleccionar medio de pago (opcional)</option>
+                  <option value="" disabled>
+                    Seleccionar medio de pago
+                  </option>
                   <option value="Efectivo">Efectivo</option>
                   <option value="Tarjeta">Tarjeta</option>
                   <option value="Pix">Pix</option>
                 </StyledInput>
+                {errors.paymentMethod && <StyledErrorText>{errors.paymentMethod.message}</StyledErrorText>}
               </StyledFieldContainer>
 
               <StyledFieldContainer marginBottom="20px">

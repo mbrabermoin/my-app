@@ -320,29 +320,81 @@ const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL;
 
 const addExpenseToSheet = async (req, res) => {
   try {
-    const { fecha, descripcion, cambio, monto, responsable, medioPago, notas } = req.body;
-    if (!fecha || !descripcion || !monto || !responsable) {
-      return sendValidationError(res, ["fecha, descripcion, monto y responsable son requeridos"]);
+    const payload = req.body ?? {};
+    const { date, description, exchange, amount, paidBy, paymentMethod, notes } = payload;
+    console.log("[addExpenseToSheet] received data:", payload);
+
+    if (!date || !description || !exchange || !amount || !paidBy) {
+      return sendValidationError(res, ["date, description, exchange, amount and paidBy are required"]);
     }
-    if (!APPS_SCRIPT_URL) {
-      return sendError(res, "GOOGLE_APPS_SCRIPT_URL no configurado", 500);
+
+    const amountNumber = Number.parseFloat(String(amount));
+    if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+      return sendValidationError(res, ["amount must be a positive number"]);
     }
-    const response = await fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fecha, descripcion, cambio, monto, responsable, medioPago, notas }),
-      redirect: "follow",
-    });
-    const text = await response.text();
-    let json;
-    try { json = JSON.parse(text); } catch { json = { raw: text }; }
-    if (!response.ok || json.error) {
-      return sendError(res, json.error ?? "Error en Apps Script", 502);
+
+    const parsedDate = new Date(date);
+    const expenseDate = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+
+    let sheetResult = null;
+    let sheetWarning = null;
+
+    if (APPS_SCRIPT_URL) {
+      try {
+        const response = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date, description, exchange, amount, paidBy, paymentMethod, notes }),
+          redirect: "follow",
+        });
+
+        const text = await response.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          json = { raw: text };
+        }
+
+        if (!response.ok || json.error) {
+          sheetWarning = json.error ?? "Apps Script returned an error";
+        } else {
+          sheetResult = json;
+        }
+      } catch (error) {
+        sheetWarning = error.message;
+      }
+    } else {
+      sheetWarning = "GOOGLE_APPS_SCRIPT_URL is not configured. Expense was saved in DB only.";
     }
-    return sendSuccess(res, json, "Gasto agregado a la planilla");
+
+    const dbResult = await pool.query(
+      `INSERT INTO public.expenses (type, amount, responsible, paymentMethod, exchange, date)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, type, amount, responsible, paymentMethod, exchange, date`,
+      [
+        String(description).trim(),
+        amountNumber,
+        String(paidBy).trim(),
+        paymentMethod ? String(paymentMethod).trim() : null,
+        String(exchange).trim(),
+        expenseDate,
+      ]
+    );
+
+    return sendSuccess(
+      res,
+      {
+        expense: dbResult.rows[0],
+        sheetResult,
+        sheetWarning,
+      },
+      sheetWarning ? "Gasto guardado con advertencia" : "Gasto agregado correctamente",
+      201,
+    );
   } catch (error) {
     console.error("[addExpenseToSheet] error:", error.message);
-    return sendError(res, "Error al agregar gasto", 500);
+    return sendError(res, "Error al agregar gasto", 500, error.message);
   }
 };
 
