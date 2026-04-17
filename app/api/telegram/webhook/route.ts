@@ -13,6 +13,8 @@ type SessionStep =
   | "awaiting_amount"
   | "awaiting_description"
   | "awaiting_paid_by"
+  | "awaiting_paid_by_custom"
+  | "awaiting_payment_method"
   | "awaiting_currency"
   | "awaiting_trip"
   | "awaiting_confirmation";
@@ -21,6 +23,7 @@ type ExpenseSessionData = {
   amount?: number;
   description?: string;
   paidBy?: string;
+  paymentMethod?: "efectivo" | "tarjeta";
   exchange?: "pesos" | "reales" | "dolares";
   travelId?: string;
 };
@@ -33,6 +36,7 @@ type SaveExpenseInput = {
   description: string;
   amount: number;
   paidBy: string;
+  paymentMethod?: string | null;
   exchange: string;
   travelId: string;
   notes?: string | null;
@@ -259,6 +263,31 @@ function currencyKeyboard(): TelegramInlineKeyboardMarkup {
   };
 }
 
+function paidByKeyboard(): TelegramInlineKeyboardMarkup {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Mati", callback_data: "exp_paid_by:mati" },
+        { text: "Juli", callback_data: "exp_paid_by:juli" },
+      ],
+      [{ text: "Otros", callback_data: "exp_paid_by:otros" }],
+      [{ text: "Cancelar", callback_data: "exp_confirm:cancel" }],
+    ],
+  };
+}
+
+function paymentMethodKeyboard(): TelegramInlineKeyboardMarkup {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Efectivo", callback_data: "exp_payment:efectivo" },
+        { text: "Tarjeta", callback_data: "exp_payment:tarjeta" },
+      ],
+      [{ text: "Cancelar", callback_data: "exp_confirm:cancel" }],
+    ],
+  };
+}
+
 async function tripKeyboard(pool: Pool): Promise<TelegramInlineKeyboardMarkup | null> {
   const result = await pool.query(
     `SELECT id, destiny FROM public.trips ORDER BY id ASC`,
@@ -305,13 +334,14 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
   }
 
   const result = await pool.query(
-    `INSERT INTO public.expenses (type, amount, responsible, exchange, travelId, travelDescription, date)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    `INSERT INTO public.expenses (type, amount, responsible, paymentMethod, exchange, travelId, travelDescription, date)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
      RETURNING id`,
     [
       input.description.trim(),
       input.amount,
       input.paidBy.trim(),
+      input.paymentMethod ? input.paymentMethod.trim() : null,
       normalizedExchange,
       input.travelId,
       tripName,
@@ -325,7 +355,7 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
     exchange: normalizedExchange,
     amount: input.amount,
     paidBy: input.paidBy.trim(),
-    paymentMethod: null,
+    paymentMethod: input.paymentMethod ? input.paymentMethod.trim() : null,
     notes: input.notes ?? `Cargado por Telegram (${tripName})`,
   });
 
@@ -383,23 +413,26 @@ async function handleWizardTextStep(
       ...session.data,
       description: text,
     });
-    await sendTelegramMessage(
-      chatId,
-      `Quién pagó? Escribí un nombre (por ejemplo: ${fromName}).`,
-    );
+    await sendTelegramMessage(chatId, "Quién pagó? Elegí una opción:", paidByKeyboard());
     return true;
   }
 
-  if (session.step === "awaiting_paid_by") {
-    await saveExpenseSession(pool, chatId, userId, "awaiting_currency", {
+  if (session.step === "awaiting_paid_by_custom") {
+    await saveExpenseSession(pool, chatId, userId, "awaiting_payment_method", {
       ...session.data,
       paidBy: text,
     });
-    await sendTelegramMessage(chatId, "Elegí la moneda:", currencyKeyboard());
+    await sendTelegramMessage(chatId, "Elegí el método de pago:", paymentMethodKeyboard());
     return true;
   }
 
-  if (session.step === "awaiting_currency" || session.step === "awaiting_trip" || session.step === "awaiting_confirmation") {
+  if (
+    session.step === "awaiting_paid_by"
+    || session.step === "awaiting_payment_method"
+    || session.step === "awaiting_currency"
+    || session.step === "awaiting_trip"
+    || session.step === "awaiting_confirmation"
+  ) {
     await sendTelegramMessage(chatId, "Para este paso usá los botones del mensaje anterior.");
     return true;
   }
@@ -458,6 +491,59 @@ async function handleWizardCallback(
     return;
   }
 
+  if (callbackData.startsWith("exp_payment:")) {
+    if (session.step !== "awaiting_payment_method") {
+      await answerCallbackQuery(callbackQueryId, "Ese paso ya pasó o todavía no corresponde");
+      return;
+    }
+
+    const selected = (callbackData.split(":")[1] ?? "").trim().toLowerCase();
+    const paymentMethod = selected === "efectivo" || selected === "tarjeta" ? selected : null;
+    if (!paymentMethod) {
+      await answerCallbackQuery(callbackQueryId, "Método inválido");
+      return;
+    }
+
+    await saveExpenseSession(pool, chatId, userId, "awaiting_currency", {
+      ...session.data,
+      paymentMethod,
+    });
+    await answerCallbackQuery(callbackQueryId, "Método guardado");
+    await sendTelegramMessage(chatId, "Elegí la moneda:", currencyKeyboard());
+    return;
+  }
+
+  if (callbackData.startsWith("exp_paid_by:")) {
+    if (session.step !== "awaiting_paid_by") {
+      await answerCallbackQuery(callbackQueryId, "Ese paso ya pasó o todavía no corresponde");
+      return;
+    }
+
+    const selected = (callbackData.split(":")[1] ?? "").trim().toLowerCase();
+    if (selected === "otros") {
+      await saveExpenseSession(pool, chatId, userId, "awaiting_paid_by_custom", {
+        ...session.data,
+      });
+      await answerCallbackQuery(callbackQueryId, "Perfecto");
+      await sendTelegramMessage(chatId, "Escribí quién pagó (nombre libre).");
+      return;
+    }
+
+    const mappedPaidBy = selected === "mati" ? "Mati" : selected === "juli" ? "Juli" : null;
+    if (!mappedPaidBy) {
+      await answerCallbackQuery(callbackQueryId, "Opción inválida");
+      return;
+    }
+
+    await saveExpenseSession(pool, chatId, userId, "awaiting_payment_method", {
+      ...session.data,
+      paidBy: mappedPaidBy,
+    });
+    await answerCallbackQuery(callbackQueryId, "Quién pagó guardado");
+    await sendTelegramMessage(chatId, "Elegí el método de pago:", paymentMethodKeyboard());
+    return;
+  }
+
   if (callbackData.startsWith("exp_trip:")) {
     if (session.step !== "awaiting_trip") {
       await answerCallbackQuery(callbackQueryId, "Ese paso ya pasó o todavía no corresponde");
@@ -487,7 +573,7 @@ async function handleWizardCallback(
 
     await sendTelegramMessage(
       chatId,
-      `<b>Confirmá el gasto:</b>\n\n📝 ${nextData.description}\n💰 ${Number(nextData.amount ?? 0).toFixed(2)} ${nextData.exchange}\n👤 ${nextData.paidBy}\n✈️ ${tripName}`,
+      `<b>Confirmá el gasto:</b>\n\n📝 ${nextData.description}\n💰 ${Number(nextData.amount ?? 0).toFixed(2)} ${nextData.exchange}\n👤 ${nextData.paidBy}\n💳 ${nextData.paymentMethod}\n✈️ ${tripName}`,
       confirmationKeyboard(),
     );
     return;
@@ -500,7 +586,7 @@ async function handleWizardCallback(
     }
 
     const data = session.data;
-    if (!data.amount || !data.description || !data.paidBy || !data.exchange || !data.travelId) {
+    if (!data.amount || !data.description || !data.paidBy || !data.paymentMethod || !data.exchange || !data.travelId) {
       await answerCallbackQuery(callbackQueryId, "Faltan datos en la sesión");
       await sendTelegramMessage(chatId, "No pude confirmar porque faltan datos. Escribí /nuevo para reiniciar.");
       await clearExpenseSession(pool, chatId, userId);
@@ -511,6 +597,7 @@ async function handleWizardCallback(
       description: data.description,
       amount: Number(data.amount),
       paidBy: data.paidBy,
+      paymentMethod: data.paymentMethod,
       exchange: data.exchange,
       travelId: data.travelId,
     });
@@ -524,7 +611,7 @@ async function handleWizardCallback(
 
     await sendTelegramMessage(
       chatId,
-      `✅ <b>Gasto agregado</b> (#${saved.expenseId})\n\n📝 ${data.description}\n💰 ${Number(data.amount).toFixed(2)} ${saved.exchange}\n👤 ${data.paidBy}\n✈️ ${saved.tripName}\n${syncLine}`,
+      `✅ <b>Gasto agregado</b> (#${saved.expenseId})\n\n📝 ${data.description}\n💰 ${Number(data.amount).toFixed(2)} ${saved.exchange}\n👤 ${data.paidBy}\n💳 ${data.paymentMethod}\n✈️ ${saved.tripName}\n${syncLine}`,
     );
     return;
   }
@@ -585,6 +672,7 @@ async function handleGastoCommand(
     description: descripcion.trim(),
     amount,
     paidBy: quienPago.trim(),
+    paymentMethod: null,
     exchange,
     travelId,
   });
