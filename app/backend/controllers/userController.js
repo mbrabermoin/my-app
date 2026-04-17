@@ -362,25 +362,12 @@ const addExpenseToSheet = async (req, res) => {
 
     if (appsScriptUrl) {
       try {
-        const requestBody = JSON.stringify({ date, description, exchange, amount, paidBy, paymentMethod, notes });
-        let response = await fetch(appsScriptUrl, {
+        const response = await fetch(appsScriptUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: requestBody,
-          redirect: "manual",
+          body: JSON.stringify({ date, description, exchange, amount, paidBy, paymentMethod, notes }),
+          redirect: "follow",
         });
-
-        if (response.status >= 300 && response.status < 400) {
-          const redirectLocation = response.headers.get("location");
-          if (redirectLocation) {
-            response = await fetch(redirectLocation, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: requestBody,
-              redirect: "follow",
-            });
-          }
-        }
 
         const text = await response.text();
         let json;
@@ -391,7 +378,8 @@ const addExpenseToSheet = async (req, res) => {
         }
 
         if (!response.ok || json.error) {
-          sheetWarning = json.error ?? "Apps Script returned an error";
+          const rawResponsePreview = String(text || "").slice(0, 180);
+          sheetWarning = json.error ?? `Apps Script status ${response.status}${rawResponsePreview ? `: ${rawResponsePreview}` : ""}`;
         } else {
           sheetResult = json;
         }
@@ -406,7 +394,8 @@ const addExpenseToSheet = async (req, res) => {
     }
 
     if (isProduction && (sheetWarning || !sheetResult)) {
-      return sendError(res, "No se pudo sincronizar con Google Sheets", 502, sheetWarning || MISSING_APPS_SCRIPT_MESSAGE);
+      const productionMessage = `No se pudo sincronizar con Google Sheets. ${sheetWarning || MISSING_APPS_SCRIPT_MESSAGE}`;
+      return sendError(res, productionMessage, 502, sheetWarning || MISSING_APPS_SCRIPT_MESSAGE);
     }
 
     const dbResult = await pool.query(
