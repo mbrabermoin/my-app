@@ -78,6 +78,7 @@ async function parseCsvFromUrl(url) {
 
 // URLs de Google Sheets (se mantienen igual)
 const TRIPS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQzheqd-dJNyaSL4m0EoCM1K4Jir9YlV9EQUVKrJiNKhQs-0TLbIGZkVmpw2fnX7MzJWOA0NSAzsdGZ/pub?gid=11106421&single=true&output=csv";
+const MARDELASPAMPAS_2024_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQzheqd-dJNyaSL4m0EoCM1K4Jir9YlV9EQUVKrJiNKhQs-0TLbIGZkVmpw2fnX7MzJWOA0NSAzsdGZ/pub?gid=1319363556&single=true&output=csv";
 const CANCUN_2024_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQzheqd-dJNyaSL4m0EoCM1K4Jir9YlV9EQUVKrJiNKhQs-0TLbIGZkVmpw2fnX7MzJWOA0NSAzsdGZ/pub?gid=1294828187&single=true&output=csv";
 const MARDEL_ENERO_2025_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQzheqd-dJNyaSL4m0EoCM1K4Jir9YlV9EQUVKrJiNKhQs-0TLbIGZkVmpw2fnX7MzJWOA0NSAzsdGZ/pub?gid=0&single=true&output=csv";
 const BRC_2025_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQzheqd-dJNyaSL4m0EoCM1K4Jir9YlV9EQUVKrJiNKhQs-0TLbIGZkVmpw2fnX7MzJWOA0NSAzsdGZ/pub?gid=83771080&single=true&output=csv";
@@ -161,6 +162,7 @@ async function importSheet() {
 
     // Procesamiento de Sheets de gastos...
     const sheetConfigs = [
+      { url: MARDELASPAMPAS_2024_URL, desc: "Mardel a las Pampas 2024", id: "1" },
       { url: CANCUN_2024_URL, desc: "Cancún 2024", id: "2" },
       { url: MARDEL_ENERO_2025_URL, desc: "Mardel 2025", id: "3" },
       { url: BRC_2025_URL, desc: "BRC 2025", id: "4" },

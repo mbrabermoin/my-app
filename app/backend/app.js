@@ -1,4 +1,13 @@
-require('dotenv').config();
+const path = require("path");
+const dotenv = require("dotenv");
+
+dotenv.config();
+
+// When backend runs through Next API routes, cwd is repo root and app/backend/.env
+// may not be auto-loaded. Fallback to backend-local env file for local development.
+if (!process.env.DATABASE_URL) {
+    dotenv.config({ path: path.resolve(__dirname, ".env"), override: true });
+}
 const express = require("express");
 const cors = require("cors");
 const swaggerUi = require("swagger-ui-express");
