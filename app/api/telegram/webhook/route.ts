@@ -556,6 +556,18 @@ async function handleWizardCallback(
   userId: string,
   callbackData: string,
 ) {
+  if (callbackData.startsWith("exp_list_trip:")) {
+    const travelId = (callbackData.split(":")[1] ?? "").trim();
+    if (!travelId) {
+      await answerCallbackQuery(callbackQueryId, "Viaje inválido");
+      return;
+    }
+
+    await answerCallbackQuery(callbackQueryId, "Cargando gastos");
+    await sendExpensesByTrip(pool, chatId, travelId);
+    return;
+  }
+
   const session = await getExpenseSession(pool, chatId, userId);
   if (!session) {
     await answerCallbackQuery(callbackQueryId, "No hay una carga activa. Escribí /nuevo");
@@ -685,18 +697,6 @@ async function handleWizardCallback(
       `<b>Confirmá el gasto:</b>\n\n📝 ${nextData.description}\n💰 ${Number(nextData.amount ?? 0).toFixed(2)} ${nextData.exchange}\n👤 ${nextData.paidBy}\n💳 ${nextData.paymentMethod}\n✈️ ${tripName}`,
       confirmationKeyboard(),
     );
-    return;
-  }
-
-  if (callbackData.startsWith("exp_list_trip:")) {
-    const travelId = (callbackData.split(":")[1] ?? "").trim();
-    if (!travelId) {
-      await answerCallbackQuery(callbackQueryId, "Viaje inválido");
-      return;
-    }
-
-    await answerCallbackQuery(callbackQueryId, "Cargando gastos");
-    await sendExpensesByTrip(pool, chatId, travelId);
     return;
   }
 
