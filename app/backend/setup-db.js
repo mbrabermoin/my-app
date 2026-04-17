@@ -53,6 +53,22 @@ async function setupDatabase() {
       console.log(`📊 Total de usuarios: ${users.rows[0].count}`);
     }
 
+    // Crear tabla telegram_messages si no existe
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS telegram_messages (
+        id SERIAL PRIMARY KEY,
+        update_id BIGINT UNIQUE,
+        from_id BIGINT,
+        from_name VARCHAR(255),
+        from_username VARCHAR(255),
+        chat_id BIGINT,
+        chat_type VARCHAR(50),
+        text TEXT,
+        received_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log("✅ Tabla telegram_messages verificada");
+
     console.log("\n🎉 Base de datos configurada correctamente!");
   } catch (error) {
     console.error("❌ Error configurando base de datos:", error.message);

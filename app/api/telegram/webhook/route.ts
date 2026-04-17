@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Pool } from "pg";
 
 const parseIdAllowlist = (rawValue?: string) =>
   new Set(
@@ -46,15 +47,30 @@ export async function POST(req: Request) {
 
     // El Happy Path: Ver el mensaje en la consola
     console.log("--- ¡Mensaje Recibido de Telegram! ---");
-    console.log("Meta:", {
-      updateId: body.update_id,
-      fromId,
-      chatId,
-      fromName,
-    });
-
-    // Extraemos el texto para el log específico
+    console.log("Meta:", { updateId: body.update_id, fromId, chatId, fromName });
     console.log(`Mati, ${fromName} escribió: ${text ?? "(sin texto)"}`);
+
+    // Guardar en la base de datos
+    try {
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      await pool.query(
+        `INSERT INTO telegram_messages (update_id, from_id, from_name, from_username, chat_id, chat_type, text)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (update_id) DO NOTHING`,
+        [
+          body.update_id,
+          fromId,
+          fromName,
+          payloadMessage?.from?.username ?? null,
+          chatId,
+          payloadMessage?.chat?.type ?? null,
+          text ?? null,
+        ],
+      );
+      await pool.end();
+    } catch (dbErr) {
+      console.error("[Telegram] Error guardando en DB:", dbErr);
+    }
 
     // Telegram necesita un 200 OK para saber que recibiste el mensaje
     return NextResponse.json({ ok: true });

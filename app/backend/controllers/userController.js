@@ -316,10 +316,26 @@ const testConnection = async (req, res) => {
   }
 };
 
+const getTelegramMessages = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, update_id, from_id, from_name, from_username, chat_id, chat_type, text, received_at
+       FROM telegram_messages
+       ORDER BY received_at DESC
+       LIMIT 100`
+    );
+    return sendSuccess(res, { messages: result.rows }, "Messages retrieved");
+  } catch (error) {
+    console.error("[getTelegramMessages] error:", error.message);
+    return sendError(res, "Error retrieving messages", 500);
+  }
+};
+
 module.exports = {
   getUsers,
   getExpenses,
   getTrips,
   createUser,
   testConnection,
+  getTelegramMessages,
 };
