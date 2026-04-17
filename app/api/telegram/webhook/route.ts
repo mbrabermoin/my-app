@@ -220,17 +220,10 @@ async function syncExpenseToGoogleSheet(payload: {
 
 const HELP_TEXT = `<b>Comandos disponibles:</b>
 
-<b>/gasto</b> <code>[monto] [descripcion] [quienPago] [moneda] [viajeId]</code>
-Carga rápida en una sola línea.
-
 <b>/nuevo</b>
 Carga guiada paso a paso con botones.
 
-📌 <b>Moneda:</b> <code>pesos</code> | <code>reales</code> | <code>dolares</code>
-📌 <b>viajeId:</b> número del viaje (opcional, usa el último si lo omitís)
-
-<b>Ejemplo:</b>
-<code>/gasto 1500 Almuerzo Mati pesos 6</code>
+<b>Flujo:</b> monto → descripción → quién pagó → método de pago → moneda → viaje → confirmar
 
 <b>/viajes</b> — lista los viajes disponibles
 <b>/cancel</b> — cancela una carga guiada activa
@@ -619,74 +612,6 @@ async function handleWizardCallback(
   await answerCallbackQuery(callbackQueryId, "Acción no reconocida");
 }
 
-async function handleGastoCommand(
-  pool: Pool,
-  chatId: number | string,
-  _fromName: string,
-  args: string[],
-) {
-  // args: [monto, descripcion, quienPago, moneda, viajeId?]
-  if (args.length < 4) {
-    await sendTelegramMessage(
-      chatId,
-      `⚠️ Faltan parámetros.\n\n${HELP_TEXT}`,
-    );
-    return;
-  }
-
-  const [rawMonto, descripcion, quienPago, moneda, rawViajeId] = args;
-
-  const amount = parseFloat(rawMonto.replace(",", "."));
-  if (!isFinite(amount) || amount <= 0) {
-    await sendTelegramMessage(chatId, `❌ Monto inválido: <code>${rawMonto}</code>`);
-    return;
-  }
-
-  const validCurrencies = ["pesos", "reales", "dolares", "usd"];
-  const exchange = moneda.toLowerCase();
-  if (!validCurrencies.includes(exchange)) {
-    await sendTelegramMessage(
-      chatId,
-      `❌ Moneda inválida: <code>${moneda}</code>\nUsá: pesos | reales | dolares`,
-    );
-    return;
-  }
-
-  let travelId: string | null = rawViajeId ?? null;
-  if (!travelId) {
-    const latestTrip = await pool.query(
-      `SELECT id FROM public.trips ORDER BY id DESC LIMIT 1`,
-    );
-    travelId = latestTrip.rows[0]?.id ? String(latestTrip.rows[0].id) : null;
-  }
-
-  if (!travelId) {
-    await sendTelegramMessage(
-      chatId,
-      "❌ No hay viajes cargados todavía. Cargá viajes primero.",
-    );
-    return;
-  }
-
-  const saved = await saveExpenseAndSync(pool, {
-    description: descripcion.trim(),
-    amount,
-    paidBy: quienPago.trim(),
-    paymentMethod: null,
-    exchange,
-    travelId,
-  });
-
-  const syncLine = saved.sheetSync.ok
-    ? "📄 Sync Sheet: OK"
-    : `⚠️ Sync Sheet falló: ${saved.sheetSync.message}`;
-
-  await sendTelegramMessage(
-    chatId,
-    `✅ <b>Gasto agregado</b> (#${saved.expenseId})\n\n📝 ${descripcion}\n💰 ${amount.toFixed(2)} ${saved.exchange}\n👤 ${quienPago}\n✈️ ${saved.tripName}\n${syncLine}`,
-  );
-}
-
 async function handleViajesCommand(pool: Pool, chatId: number | string) {
   const trips = await pool.query(
     `SELECT id, destiny FROM public.trips ORDER BY id ASC`,
@@ -773,29 +698,7 @@ export async function POST(req: Request) {
 
       if (text && chatId && fromId) {
         const trimmed = text.trim();
-        if (trimmed.startsWith("/gasto") || trimmed.startsWith("/gasto@")) {
-          const withoutCmd = trimmed.replace(/^\/gasto(?:@\S+)?\s*/i, "");
-          const tokens = withoutCmd.trim().split(/\s+/);
-          let args: string[];
-          if (tokens.length > 4) {
-            const lastIsId = /^\d+$/.test(tokens[tokens.length - 1]);
-            if (lastIsId && tokens.length >= 5) {
-              const viajeId = tokens[tokens.length - 1];
-              const moneda = tokens[tokens.length - 2];
-              const quienPago = tokens[tokens.length - 3];
-              const desc = tokens.slice(1, tokens.length - 3).join(" ");
-              args = [tokens[0], desc, quienPago, moneda, viajeId];
-            } else {
-              const moneda = tokens[tokens.length - 1];
-              const quienPago = tokens[tokens.length - 2];
-              const desc = tokens.slice(1, tokens.length - 2).join(" ");
-              args = [tokens[0], desc, quienPago, moneda];
-            }
-          } else {
-            args = tokens;
-          }
-          await handleGastoCommand(pool, chatId, fromName, args);
-        } else if (trimmed.startsWith("/nuevo")) {
+        if (trimmed.startsWith("/nuevo")) {
           await startWizard(pool, String(chatId), String(fromId));
         } else if (trimmed.startsWith("/cancel")) {
           await clearExpenseSession(pool, String(chatId), String(fromId));
