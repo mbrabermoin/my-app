@@ -11,12 +11,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "next": "latest",
     "@types/styled-components": "^5.1.36",
+    "googleapis": "^171.4.0",
+    "next": "latest",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.71.2",
-    "styled-components": "^6.3.11"
+    "styled-components": "^6.3.11",
+    "telegraf": "^4.16.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

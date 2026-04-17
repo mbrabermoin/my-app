@@ -230,6 +230,7 @@ const ExpenseList: React.FC = () => {
           <StyledHeaderTop>
             <StyledTitleGroup>
               <h1>Gastos de <em>viaje</em></h1>
+              <p>JULI & MATI - TRACKER PERSONAL 🛫</p>
               <p>
                 {selectedTrip
                   ? `${selectedTrip.destiny} · ${formatTripDate(selectedTrip.startDate)} – ${formatTripDate(selectedTrip.endDate)}`
