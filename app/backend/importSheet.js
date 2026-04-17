@@ -84,6 +84,8 @@ const BRC_2025_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQzheqd-dJ
 const CARILO_2025_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQzheqd-dJNyaSL4m0EoCM1K4Jir9YlV9EQUVKrJiNKhQs-0TLbIGZkVmpw2fnX7MzJWOA0NSAzsdGZ/pub?gid=1589138416&single=true&output=csv";
 const BUZIOS_2025_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQzheqd-dJNyaSL4m0EoCM1K4Jir9YlV9EQUVKrJiNKhQs-0TLbIGZkVmpw2fnX7MzJWOA0NSAzsdGZ/pub?gid=1539444841&single=true&output=csv";
 const PANAMA_2026_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQzheqd-dJNyaSL4m0EoCM1K4Jir9YlV9EQUVKrJiNKhQs-0TLbIGZkVmpw2fnX7MzJWOA0NSAzsdGZ/pub?gid=323108715&single=true&output=csv";
+const NEXT_TRIP_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQzheqd-dJNyaSL4m0EoCM1K4Jir9YlV9EQUVKrJiNKhQs-0TLbIGZkVmpw2fnX7MzJWOA0NSAzsdGZ/pub?gid=507624384&single=true&output=csv";
+
 
 async function importSheet() {
   console.log("🚀 Starting import process...");
@@ -164,7 +166,9 @@ async function importSheet() {
       { url: BRC_2025_URL, desc: "BRC 2025", id: "4" },
       { url: CARILO_2025_URL, desc: "Cariló 2025", id: "5" },
       { url: BUZIOS_2025_URL, desc: "Buzios 2025", id: "6" },
-      { url: PANAMA_2026_URL, desc: "Panama 2026", id: "7" }
+      { url: PANAMA_2026_URL, desc: "Panama 2026", id: "7" },
+      { url: NEXT_TRIP_URL, desc: "Next Trip", id: "8" }
+
     ];
 
     for (const config of sheetConfigs) {

@@ -316,7 +316,25 @@ const testConnection = async (req, res) => {
   }
 };
 
-const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL;
+const MISSING_APPS_SCRIPT_MESSAGE = "GOOGLE_APPS_SCRIPT_URL is not configured. Expense was saved in DB only.";
+
+const getAppsScriptUrl = () => {
+  const configuredUrl =
+    process.env.GOOGLE_APPS_SCRIPT_URL ||
+    process.env.APPS_SCRIPT_URL ||
+    process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL;
+
+  if (!configuredUrl) return null;
+
+  const trimmedUrl = String(configuredUrl).trim();
+  if (!trimmedUrl) return null;
+
+  if (trimmedUrl.includes("/exec") || trimmedUrl.includes("/dev")) {
+    return trimmedUrl;
+  }
+
+  return `${trimmedUrl.replace(/\/+$/, "")}/exec`;
+};
 
 const addExpenseToSheet = async (req, res) => {
   try {
@@ -336,17 +354,33 @@ const addExpenseToSheet = async (req, res) => {
     const parsedDate = new Date(date);
     const expenseDate = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
 
+    const appsScriptUrl = getAppsScriptUrl();
+    const isProduction = process.env.NODE_ENV === "production";
+
     let sheetResult = null;
     let sheetWarning = null;
 
-    if (APPS_SCRIPT_URL) {
+    if (appsScriptUrl) {
       try {
-        const response = await fetch(APPS_SCRIPT_URL, {
+        const requestBody = JSON.stringify({ date, description, exchange, amount, paidBy, paymentMethod, notes });
+        let response = await fetch(appsScriptUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ date, description, exchange, amount, paidBy, paymentMethod, notes }),
-          redirect: "follow",
+          body: requestBody,
+          redirect: "manual",
         });
+
+        if (response.status >= 300 && response.status < 400) {
+          const redirectLocation = response.headers.get("location");
+          if (redirectLocation) {
+            response = await fetch(redirectLocation, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: requestBody,
+              redirect: "follow",
+            });
+          }
+        }
 
         const text = await response.text();
         let json;
@@ -365,7 +399,14 @@ const addExpenseToSheet = async (req, res) => {
         sheetWarning = error.message;
       }
     } else {
-      sheetWarning = "GOOGLE_APPS_SCRIPT_URL is not configured. Expense was saved in DB only.";
+      console.warn("[addExpenseToSheet]", MISSING_APPS_SCRIPT_MESSAGE);
+      if (!isProduction) {
+        sheetWarning = MISSING_APPS_SCRIPT_MESSAGE;
+      }
+    }
+
+    if (isProduction && (sheetWarning || !sheetResult)) {
+      return sendError(res, "No se pudo sincronizar con Google Sheets", 502, sheetWarning || MISSING_APPS_SCRIPT_MESSAGE);
     }
 
     const dbResult = await pool.query(
