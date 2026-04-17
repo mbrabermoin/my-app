@@ -225,6 +225,7 @@ Carga guiada paso a paso con botones.
 
 <b>Flujo:</b> monto → descripción → quién pagó → método de pago → moneda → viaje → confirmar
 
+<b>/gastos</b> — elegís un viaje y te muestra el listado de gastos
 <b>/viajes</b> — lista los viajes disponibles
 <b>/cancel</b> — cancela una carga guiada activa
 <b>/ayuda</b> — muestra este mensaje`;
@@ -299,6 +300,21 @@ async function tripKeyboard(pool: Pool): Promise<TelegramInlineKeyboardMarkup | 
   };
 }
 
+async function expensesTripKeyboard(pool: Pool): Promise<TelegramInlineKeyboardMarkup | null> {
+  const result = await pool.query(
+    `SELECT id, destiny FROM public.trips ORDER BY id ASC`,
+  );
+
+  if (result.rowCount === 0) {
+    return null;
+  }
+
+  const rows = result.rows as Array<{ id: number; destiny: string }>;
+  return {
+    inline_keyboard: rows.map((trip) => [{ text: `${trip.id} - ${trip.destiny}`, callback_data: `exp_list_trip:${trip.id}` }]),
+  };
+}
+
 function confirmationKeyboard(): TelegramInlineKeyboardMarkup {
   return {
     inline_keyboard: [
@@ -308,6 +324,106 @@ function confirmationKeyboard(): TelegramInlineKeyboardMarkup {
       ],
     ],
   };
+}
+
+function escapeHtml(value: string | null | undefined) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function formatExpenseDate(value: string | Date | null | undefined) {
+  if (!value) {
+    return "Sin fecha";
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Sin fecha";
+  }
+
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatExpenseAmount(value: number | string | null | undefined) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) {
+    return "0.00";
+  }
+  return amount.toFixed(2);
+}
+
+async function sendExpensesByTrip(pool: Pool, chatId: number | string, travelId: string) {
+  const tripResult = await pool.query(
+    `SELECT id, destiny FROM public.trips WHERE id = $1`,
+    [travelId],
+  );
+
+  if (tripResult.rowCount === 0) {
+    await sendTelegramMessage(chatId, `❌ No existe el viaje con ID ${travelId}.`);
+    return;
+  }
+
+  const tripName = String(tripResult.rows[0].destiny);
+  const expensesResult = await pool.query(
+    `SELECT id, type, amount, responsible, paymentmethod, exchange, date
+     FROM public.expenses
+     WHERE travelid = $1
+     ORDER BY date DESC, id DESC
+     LIMIT 20`,
+    [travelId],
+  );
+
+  if (expensesResult.rowCount === 0) {
+    await sendTelegramMessage(chatId, `No hay gastos cargados para <b>${escapeHtml(tripName)}</b>.`);
+    return;
+  }
+
+  const totals = await pool.query(
+    `SELECT exchange, COALESCE(SUM(amount), 0) AS total
+     FROM public.expenses
+     WHERE travelid = $1
+     GROUP BY exchange`,
+    [travelId],
+  );
+
+  const totalLines = (totals.rows as Array<{ exchange: string; total: string | number }>).map(
+    (row) => `• ${formatExpenseAmount(row.total)} ${escapeHtml(String(row.exchange).toUpperCase())}`,
+  );
+
+  const expenseLines = (expensesResult.rows as Array<{
+    id: number;
+    type: string;
+    amount: string | number;
+    responsible: string | null;
+    paymentmethod: string | null;
+    exchange: string | null;
+    date: string | Date | null;
+  }>).map((expense) => {
+    const date = formatExpenseDate(expense.date);
+    const description = escapeHtml(expense.type);
+    const amount = formatExpenseAmount(expense.amount);
+    const exchange = escapeHtml(String(expense.exchange ?? "").toUpperCase() || "-");
+    const paidBy = escapeHtml(expense.responsible || "Sin responsable");
+    const paymentMethod = escapeHtml(expense.paymentmethod || "Sin método");
+    return `• ${date} | ${description} | ${amount} ${exchange} | ${paidBy} | ${paymentMethod}`;
+  });
+
+  const message = [
+    `<b>Gastos de ${escapeHtml(tripName)}</b>`,
+    "",
+    ...expenseLines,
+    "",
+    "<b>Totales por moneda</b>",
+    ...(totalLines.length > 0 ? totalLines : ["• 0.00"]),
+  ].join("\n");
+
+  await sendTelegramMessage(chatId, message);
 }
 
 async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
@@ -572,6 +688,18 @@ async function handleWizardCallback(
     return;
   }
 
+  if (callbackData.startsWith("exp_list_trip:")) {
+    const travelId = (callbackData.split(":")[1] ?? "").trim();
+    if (!travelId) {
+      await answerCallbackQuery(callbackQueryId, "Viaje inválido");
+      return;
+    }
+
+    await answerCallbackQuery(callbackQueryId, "Cargando gastos");
+    await sendExpensesByTrip(pool, chatId, travelId);
+    return;
+  }
+
   if (callbackData === "exp_confirm:save") {
     if (session.step !== "awaiting_confirmation") {
       await answerCallbackQuery(callbackQueryId, "No hay nada para confirmar");
@@ -703,6 +831,13 @@ export async function POST(req: Request) {
         } else if (trimmed.startsWith("/cancel")) {
           await clearExpenseSession(pool, String(chatId), String(fromId));
           await sendTelegramMessage(chatId, "Carga cancelada.");
+        } else if (trimmed.startsWith("/gastos")) {
+          const keyboard = await expensesTripKeyboard(pool);
+          if (!keyboard) {
+            await sendTelegramMessage(chatId, "No hay viajes disponibles.");
+          } else {
+            await sendTelegramMessage(chatId, "Elegí el viaje para ver sus gastos:", keyboard);
+          }
         } else if (trimmed.startsWith("/viajes")) {
           await handleViajesCommand(pool, chatId);
         } else if (trimmed.startsWith("/ayuda") || trimmed.startsWith("/start")) {
