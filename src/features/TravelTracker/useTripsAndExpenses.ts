@@ -17,9 +17,24 @@ interface Expense {
   amount: number;
   date: string;
   category: string;
+  travelId: string;
   tripDescription: string;
   exchange: string;
   responsible: string;
+}
+
+interface ExpenseApiItem {
+  id?: number;
+  type?: string;
+  amount?: number | string;
+  date?: string;
+  category?: string;
+  travelId?: string | number;
+  travelid?: string | number;
+  tripDescription?: string;
+  travelDescription?: string;
+  exchange?: string;
+  responsible?: string;
 }
 
 interface PaginationParams {
@@ -73,10 +88,9 @@ export const useTripsAndExpenses = () => {
   const loadExpenses = async (currentPage: number) => {
     try {
       setLoading(true);
-      let url = apiUrl(`/api/expenses?page=${currentPage}`);
-      if (selectedTrip) {
-        url += `&travelId=${selectedTrip.id}`;
-      }
+      const url = selectedTrip
+        ? apiUrl(`/api/expenses?page=${currentPage}&limit=50&travelId=${selectedTrip.id}`)
+        : apiUrl("/api/expenses");
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -84,10 +98,30 @@ export const useTripsAndExpenses = () => {
       }
 
       const data = await response.json();
-      setExpenses(data.data.expenses || []);
+      const normalizedExpenses: Expense[] = (data.data.expenses || []).map((item: ExpenseApiItem) => ({
+        id: Number(item.id || 0),
+        type: String(item.type || ""),
+        amount: Number(item.amount || 0),
+        date: String(item.date || ""),
+        category: String(item.category || ""),
+        travelId: String(item.travelId ?? item.travelid ?? ""),
+        tripDescription: String(item.tripDescription ?? item.travelDescription ?? ""),
+        exchange: String(item.exchange || ""),
+        responsible: String(item.responsible || ""),
+      }));
+
+      setExpenses(normalizedExpenses);
 
       if (data.data.pagination) {
         setPagination(data.data.pagination);
+      } else {
+        setPagination({
+          totalPages: 1,
+          totalExpenses: normalizedExpenses.length,
+          currentPage: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        });
       }
     } catch (error) {
       console.error("❌ Error loading expenses:", error);

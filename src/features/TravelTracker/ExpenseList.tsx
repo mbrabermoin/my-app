@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import AddExpenseModal from "./components/AddExpenseModal";
+import TripsGallery from "./components/TripsGallery";
 import { useTripsAndExpenses } from "./useTripsAndExpenses";
 import { apiUrl } from "../../lib/api";
 import {
@@ -62,10 +63,12 @@ const ExpenseList: React.FC = () => {
 
   const { currentPage, hasNextPage, hasPrevPage } = pagination;
   const [selectedResponsible, setSelectedResponsible] = React.useState<string | null>(null);
+  const isViewingAllTrips = selectedTrip === null;
 
   const dolarPesosExchange = selectedTrip?.dolarPesosExchange ?? 1;
   const dolarRealExchange = selectedTrip?.dolarRealExchange ?? 1;
   const round2 = (v: number) => Math.round(v * 100) / 100;
+  const formatAmount = (value: number) => round2(value).toFixed(2);
 
   const formatDate = (date?: string) => {
     if (!date) return "-";
@@ -179,15 +182,15 @@ const ExpenseList: React.FC = () => {
             </StyledCardRow>
             <StyledCardRow>
               <StyledCardLabel>Monto</StyledCardLabel>
-              <StyledCardValue>{expense.displayExchange} {expense.amount}</StyledCardValue>
+              <StyledCardValue>{expense.displayExchange} {formatAmount(expense.amount)}</StyledCardValue>
             </StyledCardRow>
             <StyledCardRow>
               <StyledCardLabel>Pesos</StyledCardLabel>
-              <StyledCardValue className="muted">$ {expense.localCurrencyAmount}</StyledCardValue>
+              <StyledCardValue className="muted">$ {formatAmount(expense.localCurrencyAmount)}</StyledCardValue>
             </StyledCardRow>
             <StyledCardRow>
               <StyledCardLabel>USD</StyledCardLabel>
-              <StyledCardValue className="usd">U$D {expense.dollarAmount}</StyledCardValue>
+              <StyledCardValue className="usd">U$D {formatAmount(expense.dollarAmount)}</StyledCardValue>
             </StyledCardRow>
           </StyledExpenseCard>
         ))}
@@ -211,9 +214,9 @@ const ExpenseList: React.FC = () => {
               </StyledAvatarBadge>
               {expense.responsible}
             </StyledTableCell>
-            <StyledTableCell className="amount">{expense.displayExchange} {expense.amount}</StyledTableCell>
-            <StyledTableCell className="pesos">$ {expense.localCurrencyAmount}</StyledTableCell>
-            <StyledTableCell className="usd">U$D {expense.dollarAmount}</StyledTableCell>
+            <StyledTableCell className="amount">{expense.displayExchange} {formatAmount(expense.amount)}</StyledTableCell>
+            <StyledTableCell className="pesos">$ {formatAmount(expense.localCurrencyAmount)}</StyledTableCell>
+            <StyledTableCell className="usd">U$D {formatAmount(expense.dollarAmount)}</StyledTableCell>
           </StyledTableRow>
         ))}
       </tbody>
@@ -229,13 +232,13 @@ const ExpenseList: React.FC = () => {
         <StyledHeaderInner>
           <StyledHeaderTop>
             <StyledTitleGroup>
-              <h1>Gastos de <em>viaje</em></h1>
+              <h1>{isViewingAllTrips ? "Mis" : "Gastos de"} <em>viaje{isViewingAllTrips ? "s" : ""}</em></h1>
               <p>JULI & MATI - TRACKER PERSONAL 🛫</p>
-              <p>
-                {selectedTrip
-                  ? `${selectedTrip.destiny} · ${formatTripDate(selectedTrip.startDate)} – ${formatTripDate(selectedTrip.endDate)}`
-                  : "Todos los viajes"}
-              </p>
+              {selectedTrip && (
+                <p>
+                  {selectedTrip.destiny} · {formatTripDate(selectedTrip.startDate)} – {formatTripDate(selectedTrip.endDate)}
+                </p>
+              )}
             </StyledTitleGroup>
             <StyledHeaderActions>
               <StyledBackButton onClick={() => router.push("/")}>← Volver</StyledBackButton>
@@ -244,31 +247,41 @@ const ExpenseList: React.FC = () => {
             </StyledHeaderActions>
           </StyledHeaderTop>
 
-          <StyledStatsRow>
-            <StyledStat>
-              <StyledStatLabel>Gastos</StyledStatLabel>
-              <StyledStatValue>{expensesWithTotals.length}</StyledStatValue>
-            </StyledStat>
-            <StyledStatDivider />
-            <StyledStat>
-              <StyledStatLabel>Total USD</StyledStatLabel>
-              <StyledStatValue $accent>U$D {totals.dollarAmount}</StyledStatValue>
-            </StyledStat>
-            <StyledStatDivider />
-            <StyledStat>
-              <StyledStatLabel>Total Pesos</StyledStatLabel>
-              <StyledStatValue>$ {totals.localCurrencyAmount}</StyledStatValue>
-            </StyledStat>
-            {selectedTrip && (
-              <>
-                <StyledStatDivider />
-                <StyledStat>
-                  <StyledStatLabel>Dólar</StyledStatLabel>
-                  <StyledStatValue>$ {selectedTrip.dolarPesosExchange}</StyledStatValue>
-                </StyledStat>
-              </>
-            )}
-          </StyledStatsRow>
+          {!isViewingAllTrips && (
+            <StyledStatsRow>
+              <StyledStat>
+                <StyledStatLabel>Gastos</StyledStatLabel>
+                <StyledStatValue>{expensesWithTotals.length}</StyledStatValue>
+              </StyledStat>
+              <StyledStatDivider />
+              <StyledStat>
+                <StyledStatLabel>Total USD</StyledStatLabel>
+                <StyledStatValue $accent>U$D {formatAmount(totals.dollarAmount)}</StyledStatValue>
+              </StyledStat>
+              <StyledStatDivider />
+              <StyledStat>
+                <StyledStatLabel>Total Pesos</StyledStatLabel>
+                <StyledStatValue>$ {formatAmount(totals.localCurrencyAmount)}</StyledStatValue>
+              </StyledStat>
+              {selectedTrip && (
+                <>
+                  <StyledStatDivider />
+                  <StyledStat>
+                    <StyledStatLabel>Dólar</StyledStatLabel>
+                    <StyledStatValue>$ {formatAmount(selectedTrip.dolarPesosExchange)}</StyledStatValue>
+                  </StyledStat>
+                </>
+              )}
+            </StyledStatsRow>
+          )}
+          {isViewingAllTrips && (
+            <StyledStatsRow>
+              <StyledStat>
+                <StyledStatLabel>Viajes</StyledStatLabel>
+                <StyledStatValue>{trips.length}</StyledStatValue>
+              </StyledStat>
+            </StyledStatsRow>
+          )}
         </StyledHeaderInner>
       </StyledPageHeader>
 
@@ -291,33 +304,39 @@ const ExpenseList: React.FC = () => {
             ))}
           </StyledTripFilterContainer>
 
-          <StyledTripFilterContainer>
-            <StyledFilterLabel>Pagó</StyledFilterLabel>
-            <StyledChip $active={selectedResponsible === null} $person onClick={() => setSelectedResponsible(null)}>
-              Todos
-            </StyledChip>
-            {responsibles.map((r) => (
-              <StyledChip key={r} $active={selectedResponsible === r} $person onClick={() => setSelectedResponsible(r)}>
-                {r}
+          {!isViewingAllTrips && (
+            <StyledTripFilterContainer>
+              <StyledFilterLabel>Pagó</StyledFilterLabel>
+              <StyledChip $active={selectedResponsible === null} $person onClick={() => setSelectedResponsible(null)}>
+                Todos
               </StyledChip>
-            ))}
-          </StyledTripFilterContainer>
+              {responsibles.map((r) => (
+                <StyledChip key={r} $active={selectedResponsible === r} $person onClick={() => setSelectedResponsible(r)}>
+                  {r}
+                </StyledChip>
+              ))}
+            </StyledTripFilterContainer>
+          )}
         </StyledFiltersInner>
       </StyledFiltersSection>
 
       {/* ── MAIN ── */}
       <StyledMain>
-        {/* Totals bar */}
-        <StyledTotalsBar>
+        {isViewingAllTrips ? (
+          <TripsGallery trips={trips} expenses={expenses} onSelectTrip={setSelectedTrip} />
+        ) : (
+          <>
+          {/* Totals bar */}
+          <StyledTotalsBar>
           <StyledTotalCard>
             <StyledTotalCardLabel>Total USD</StyledTotalCardLabel>
-            <StyledTotalCardValue $color="#d4a853">U$D {totals.dollarAmount}</StyledTotalCardValue>
+            <StyledTotalCardValue $color="#d4a853">U$D {formatAmount(totals.dollarAmount)}</StyledTotalCardValue>
           </StyledTotalCard>
           {personEntries.map(([name, usd]) => (
             <StyledTotalCard key={name}>
               <StyledTotalCardLabel>{name} pagó</StyledTotalCardLabel>
               <StyledTotalCardValue $color={name.toLowerCase().startsWith("j") ? "#c4714a" : "#8a9e7e"}>
-                U$D {usd}
+                U$D {formatAmount(usd)}
               </StyledTotalCardValue>
             </StyledTotalCard>
           ))}
@@ -326,7 +345,7 @@ const ExpenseList: React.FC = () => {
               <StyledTotalCardLabel>Diferencia</StyledTotalCardLabel>
               <StyledTotalCardValue style={{ fontSize: "14px", lineHeight: "1.4" }}>
                 {minPayer[0]} le debe a {maxPayer[0]}<br />
-                <span style={{ fontSize: "20px", fontWeight: 500 }}>U$D {diff}</span>
+                <span style={{ fontSize: "20px", fontWeight: 500 }}>U$D {formatAmount(diff)}</span>
               </StyledTotalCardValue>
             </StyledTotalCard>
           )}
@@ -362,6 +381,8 @@ const ExpenseList: React.FC = () => {
             Siguiente →
           </StyledPaginationButton>
         </StyledPaginationContainer>
+          </>
+        )}
       </StyledMain>
     </StyledPage>
   );

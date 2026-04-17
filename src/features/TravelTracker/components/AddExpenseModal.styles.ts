@@ -1,4 +1,4 @@
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
 
 const terracotta = "#c4714a";
 const deep = "#1a1410";
@@ -81,6 +81,50 @@ export const StyledErrorContainer = styled.div`
   border-radius: 10px;
   margin-bottom: 15px;
   border: 1px solid rgba(196, 113, 74, 0.36);
+`;
+
+export const StyledSuccessContainer = styled.div`
+  background: #edf8f1;
+  color: #1f6b3b;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  border: 1px solid rgba(44, 140, 82, 0.35);
+`;
+
+const successPopupIn = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+`;
+
+export const StyledSuccessPopup = styled.div`
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 10000;
+  background: linear-gradient(145deg, #edf8f1, #e4f4ea);
+  color: #1f6b3b;
+  border: 1px solid rgba(44, 140, 82, 0.35);
+  box-shadow: 0 14px 36px rgba(31, 107, 59, 0.22);
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  animation: ${successPopupIn} 220ms ease-out;
+
+  @media (max-width: 640px) {
+    right: 14px;
+    left: 14px;
+    bottom: 14px;
+    text-align: center;
+  }
 `;
 
 export const StyledFieldContainer = styled.div<{ marginBottom?: string }>`

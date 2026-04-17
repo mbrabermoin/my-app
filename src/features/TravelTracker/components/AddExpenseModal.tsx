@@ -7,6 +7,7 @@ import {
   StyledModalContent,
   StyledModalHeader,
   StyledErrorContainer,
+  StyledSuccessPopup,
   StyledFieldContainer,
   StyledLabel,
   StyledInput,
@@ -42,6 +43,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [successMessage, setSuccessMessage] = useState<string>("");
   const todayDate = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
     .toISOString()
     .split("T")[0];
@@ -61,6 +63,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
   const onSubmit = async (data: FormData) => {
     setIsLoading(true);
     setError("");
+    setSuccessMessage("");
 
     try {
       const response = await fetch(apiUrl("/api/expenses/sheet"), {
@@ -82,8 +85,12 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
 
       const result = await response.json();
       onAddExpense(result.data || result);
-      reset();
+      reset({ date: todayDate });
       setIsModalOpen(false);
+      setSuccessMessage("El gasto se agregó correctamente!");
+      setTimeout(() => {
+        setSuccessMessage("");
+      }, 2600);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al agregar gasto");
     } finally {
@@ -94,7 +101,8 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setError("");
-    reset();
+    setSuccessMessage("");
+    reset({ date: todayDate });
   };
 
   return (
@@ -230,6 +238,8 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
           </StyledModalContent>
         </StyledModalOverlay>
       )}
+
+      {successMessage && <StyledSuccessPopup>{successMessage}</StyledSuccessPopup>}
     </>
   );
 };
