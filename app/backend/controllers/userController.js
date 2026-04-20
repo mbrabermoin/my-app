@@ -505,11 +505,11 @@ const processPendingExpenseSync = async (limit = 20) => {
 const addExpenseToSheet = async (req, res) => {
   try {
     const payload = req.body ?? {};
-    const { date, description, exchange, amount, paidBy, paymentMethod, notes } = payload;
+    const { travelId, date, description, exchange, amount, paidBy, paymentMethod, notes } = payload;
     console.log("[addExpenseToSheet] received data:", payload);
 
-    if (!date || !description || !exchange || !amount || !paidBy) {
-      return sendValidationError(res, ["date, description, exchange, amount and paidBy are required"]);
+    if (!travelId || !date || !description || !exchange || !amount || !paidBy) {
+      return sendValidationError(res, ["travelId, date, description, exchange, amount and paidBy are required"]);
     }
 
     const amountNumber = Number.parseFloat(String(amount));
@@ -520,10 +520,23 @@ const addExpenseToSheet = async (req, res) => {
     const parsedDate = new Date(date);
     const expenseDate = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
 
+    const tripResult = await pool.query(
+      `SELECT id, destiny, sheettab FROM public.trips WHERE id = $1`,
+      [String(travelId)],
+    );
+
+    if (tripResult.rowCount === 0) {
+      return sendValidationError(res, ["travelId no existe"]);
+    }
+
+    const tripRow = tripResult.rows[0];
+    const travelDescription = String(tripRow.destiny || "").trim();
+    const sheetName = String(tripRow.sheettab || tripRow.destiny || "").trim();
+
     const dbResult = await pool.query(
-      `INSERT INTO public.expenses (type, amount, responsible, paymentMethod, exchange, date)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, type, amount, responsible, paymentMethod, exchange, date`,
+      `INSERT INTO public.expenses (type, amount, responsible, paymentMethod, exchange, date, travelId, travelDescription)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, type, amount, responsible, paymentMethod, exchange, date, travelId, travelDescription`,
       [
         String(description).trim(),
         amountNumber,
@@ -531,6 +544,8 @@ const addExpenseToSheet = async (req, res) => {
         paymentMethod ? String(paymentMethod).trim() : null,
         String(exchange).trim(),
         expenseDate,
+        String(travelId),
+        travelDescription,
       ]
     );
 
@@ -542,6 +557,9 @@ const addExpenseToSheet = async (req, res) => {
       amount: amountNumber,
       paidBy: String(paidBy).trim(),
       paymentMethod: paymentMethod ? String(paymentMethod).trim() : null,
+      travelId: String(travelId),
+      travelDescription,
+      sheetName,
       notes: notes ? String(notes).trim() : null,
     };
 

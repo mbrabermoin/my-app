@@ -26,6 +26,7 @@ interface Expense {
 }
 
 interface FormData {
+  travelId: string;
   date: string;
   description: string;
   exchange: string;
@@ -35,11 +36,18 @@ interface FormData {
   notes: string;
 }
 
-interface AddExpenseModalProps {
-  onAddExpense: (expense: Expense) => void;
+interface TripOption {
+  id: number;
+  destiny: string;
 }
 
-const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
+interface AddExpenseModalProps {
+  onAddExpense: (expense: Expense) => void;
+  trips: TripOption[];
+  selectedTripId?: number | null;
+}
+
+const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense, trips, selectedTripId }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -56,6 +64,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
   } = useForm<FormData>({
     mode: "onChange",
     defaultValues: {
+      travelId: selectedTripId ? String(selectedTripId) : "",
       date: todayDate,
     },
   });
@@ -88,7 +97,10 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
       if (createdExpense) {
         onAddExpense(createdExpense);
       }
-      reset({ date: todayDate });
+      reset({
+        travelId: selectedTripId ? String(selectedTripId) : "",
+        date: todayDate,
+      });
       setIsModalOpen(false);
       const syncStatus = result?.data?.sync?.status;
       if (syncStatus === "pending") {
@@ -110,12 +122,25 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
     setIsModalOpen(false);
     setError("");
     setSuccessMessage("");
-    reset({ date: todayDate });
+    reset({
+      travelId: selectedTripId ? String(selectedTripId) : "",
+      date: todayDate,
+    });
+  };
+
+  const handleOpenModal = () => {
+    setError("");
+    setSuccessMessage("");
+    reset({
+      travelId: selectedTripId ? String(selectedTripId) : "",
+      date: todayDate,
+    });
+    setIsModalOpen(true);
   };
 
   return (
     <>
-      <StyledAddButton onClick={() => setIsModalOpen(true)}>
+      <StyledAddButton onClick={handleOpenModal}>
         + Agregar Gasto
       </StyledAddButton>
 
@@ -127,6 +152,27 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
             {error && <StyledErrorContainer>{error}</StyledErrorContainer>}
 
             <form onSubmit={handleSubmit(onSubmit)}>
+              <div className="modal-fields">
+              <StyledFieldContainer>
+                <StyledLabel>Viaje:</StyledLabel>
+                <StyledInput
+                  as="select"
+                  hasError={!!errors.travelId}
+                  {...register("travelId", { required: "El viaje es requerido" })}
+                  defaultValue={selectedTripId ? String(selectedTripId) : ""}
+                >
+                  <option value="" disabled>
+                    Seleccionar viaje
+                  </option>
+                  {trips.map((trip) => (
+                    <option key={trip.id} value={trip.id}>
+                      {trip.destiny}
+                    </option>
+                  ))}
+                </StyledInput>
+                {errors.travelId && <StyledErrorText>{errors.travelId.message}</StyledErrorText>}
+              </StyledFieldContainer>
+
               <StyledFieldContainer>
                 <StyledLabel>Fecha:</StyledLabel>
                 <StyledInput
@@ -223,6 +269,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
                   placeholder="Opcional..."
                 />
               </StyledFieldContainer>
+              </div>
 
               <StyledButtonContainer>
                 <StyledCancelButton

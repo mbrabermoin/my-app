@@ -51,9 +51,28 @@ export const StyledModalContent = styled.div`
   border-radius: 20px;
   width: 480px;
   max-width: 90%;
+  height: 80vh;
+  max-height: 80vh;
   box-shadow: 0 40px 80px rgba(0, 0, 0, 0.28);
   position: relative;
   color: ${deep};
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  form {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-fields {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 6px;
+  }
 
   &::before {
     content: "";
@@ -173,7 +192,11 @@ export const StyledButtonContainer = styled.div`
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-  margin-top: 24px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: ${cream};
+  flex-shrink: 0;
 `;
 
 export const StyledCancelButton = styled.button<{ isLoading?: boolean }>`

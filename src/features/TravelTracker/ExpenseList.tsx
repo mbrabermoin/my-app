@@ -259,7 +259,11 @@ const ExpenseList: React.FC = () => {
             <StyledHeaderActions>
               <StyledBackButton onClick={() => router.push("/")}>← Volver</StyledBackButton>
               <StyledSyncButton onClick={handleSyncClick}>⟳ Importar desde Sheet</StyledSyncButton>
-              <AddExpenseModal onAddExpense={handleExpenseAddedWithSyncRefresh} />
+              <AddExpenseModal
+                onAddExpense={handleExpenseAddedWithSyncRefresh}
+                trips={trips.map((trip) => ({ id: trip.id, destiny: trip.destiny }))}
+                selectedTripId={selectedTrip?.id ?? null}
+              />
             </StyledHeaderActions>
           </StyledHeaderTop>
 
