@@ -48,6 +48,16 @@ import {
   StyledPaginationInfo,
 } from "./ExpenseList.styles";
 
+type SyncStatusApiResponse = {
+  success?: boolean;
+  data?: {
+    enabled?: boolean;
+    pending?: number;
+    failed?: number;
+  };
+  message?: string;
+};
+
 const ExpenseList: React.FC = () => {
   const router = useRouter();
   const {
@@ -60,6 +70,37 @@ const ExpenseList: React.FC = () => {
     loadExpenses,
     handleAddExpense,
   } = useTripsAndExpenses();
+
+  const [syncInfo, setSyncInfo] = React.useState({
+    enabled: true,
+    pending: 0,
+    failed: 0,
+    loading: true,
+  });
+
+  const loadSyncStatus = React.useCallback(async () => {
+    try {
+      const response = await fetch(apiUrl("/api/expenses/sheet/status"));
+      const data = (await response.json()) as SyncStatusApiResponse;
+      if (!response.ok || !data.success) {
+        setSyncInfo({ enabled: true, pending: 0, failed: 0, loading: false });
+        return;
+      }
+
+      setSyncInfo({
+        enabled: Boolean(data.data?.enabled),
+        pending: Number(data.data?.pending || 0),
+        failed: Number(data.data?.failed || 0),
+        loading: false,
+      });
+    } catch {
+      setSyncInfo({ enabled: true, pending: 0, failed: 0, loading: false });
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadSyncStatus();
+  }, [loadSyncStatus]);
 
   const { currentPage, hasNextPage, hasPrevPage } = pagination;
   const [selectedResponsible, setSelectedResponsible] = React.useState<string | null>(null);
@@ -152,15 +193,27 @@ const ExpenseList: React.FC = () => {
 
   const handleSyncClick = async () => {
     try {
-      const response = await fetch(apiUrl("/api/admin/sync-sheets"), {
+      const response = await fetch(apiUrl("/api/expenses/sheet/retry-pending"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
       const data = await response.json();
-      alert(data.success ? data.message : "Error: " + data.message);
+      if (!response.ok || !data.success) {
+        alert("Error: " + (data.message || "No se pudo procesar pendientes"));
+        return;
+      }
+
+      const stats = data?.data || {};
+      alert(`Pendientes procesados: ${stats.picked || 0}\nSincronizados: ${stats.synced || 0}\nCon error: ${stats.failed || 0}`);
+      await loadSyncStatus();
     } catch {
       alert("Cannot connect with server. Please try again later.");
     }
+  };
+
+  const handleExpenseAddedWithSyncRefresh = () => {
+    handleAddExpense();
+    loadSyncStatus();
   };
 
   const renderCards = () => {
@@ -232,18 +285,31 @@ const ExpenseList: React.FC = () => {
         <StyledHeaderInner>
           <StyledHeaderTop>
             <StyledTitleGroup>
-              <h1>{isViewingAllTrips ? "Mis" : "Gastos de"} <em>viaje{isViewingAllTrips ? "s" : ""}</em></h1>
+              <h1>{isViewingAllTrips ? "Nuestros" : "Gastos de"} <em>viaje{isViewingAllTrips ? "s" : ""}</em></h1>
               <p>JULI & MATI - TRACKER PERSONAL 🛫</p>
               {selectedTrip && (
                 <p>
                   {selectedTrip.destiny} · {formatTripDate(selectedTrip.startDate)} – {formatTripDate(selectedTrip.endDate)}
                 </p>
               )}
+              <p>
+                {syncInfo.loading
+                  ? "Sync: revisando estado..."
+                  : !syncInfo.enabled
+                  ? "Sync: desactivada"
+                  : syncInfo.pending > 0
+                  ? `Sync: ${syncInfo.pending} pendiente(s)${syncInfo.failed > 0 ? `, ${syncInfo.failed} con error` : ""}`
+                  : "Sync: al día"}
+              </p>
             </StyledTitleGroup>
             <StyledHeaderActions>
               <StyledBackButton onClick={() => router.push("/")}>← Volver</StyledBackButton>
-              <StyledSyncButton onClick={handleSyncClick}>⟳ Sincronizar</StyledSyncButton>
-              <AddExpenseModal onAddExpense={handleAddExpense} />
+              {syncInfo.enabled && syncInfo.pending > 0 && (
+                <StyledSyncButton onClick={handleSyncClick}>
+                  ⟳ Reintentar Sync ({syncInfo.pending})
+                </StyledSyncButton>
+              )}
+              <AddExpenseModal onAddExpense={handleExpenseAddedWithSyncRefresh} />
             </StyledHeaderActions>
           </StyledHeaderTop>
 

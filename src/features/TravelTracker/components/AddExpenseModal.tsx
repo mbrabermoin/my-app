@@ -84,10 +84,18 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ onAddExpense }) => {
       }
 
       const result = await response.json();
-      onAddExpense(result.data || result);
+      const createdExpense = result?.data?.expense || result?.expense;
+      if (createdExpense) {
+        onAddExpense(createdExpense);
+      }
       reset({ date: todayDate });
       setIsModalOpen(false);
-      setSuccessMessage("El gasto se agregó correctamente!");
+      const syncStatus = result?.data?.sync?.status;
+      if (syncStatus === "pending") {
+        setSuccessMessage("Gasto guardado en BD. La sincronización con Sheets quedó pendiente y se reintentará sola.");
+      } else {
+        setSuccessMessage("El gasto se agregó y sincronizó correctamente.");
+      }
       setTimeout(() => {
         setSuccessMessage("");
       }, 2600);

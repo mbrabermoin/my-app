@@ -11,6 +11,8 @@ const {
   testConnection,
   getTelegramMessages,
   addExpenseToSheet,
+  retryPendingExpenseSync,
+  getExpenseSyncStatus,
 } = require("../controllers/userController");
 
 console.log("[ROUTES] imported handlers", {
@@ -222,5 +224,9 @@ router.get("/trips", getTrips);
 router.get("/telegram/messages", getTelegramMessages);
 
 router.post("/expenses/sheet", addExpenseToSheet);
+
+router.get("/expenses/sheet/status", getExpenseSyncStatus);
+
+router.post("/expenses/sheet/retry-pending", retryPendingExpenseSync);
 
 module.exports = router;

@@ -320,6 +320,11 @@ const testConnection = async (req, res) => {
 
 const MISSING_APPS_SCRIPT_MESSAGE = "GOOGLE_APPS_SCRIPT_URL is not configured. Expense was saved in DB only.";
 
+const isSheetsSyncEnabled = () => {
+  const raw = String(process.env.SHEETS_SYNC_ENABLED ?? "true").trim().toLowerCase();
+  return raw !== "false" && raw !== "0" && raw !== "off" && raw !== "no";
+};
+
 const getAppsScriptUrl = () => {
   const configuredUrl =
     process.env.GOOGLE_APPS_SCRIPT_URL ||
@@ -336,6 +341,165 @@ const getAppsScriptUrl = () => {
   }
 
   return `${trimmedUrl.replace(/\/+$/, "")}/exec`;
+};
+
+const ensureExpenseSyncQueueTable = async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS public.expense_sheet_sync_queue (
+      expense_id BIGINT PRIMARY KEY,
+      payload JSONB NOT NULL,
+      status VARCHAR(16) NOT NULL DEFAULT 'pending',
+      retries INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      next_retry_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_expense_sheet_sync_queue_status_next_retry
+    ON public.expense_sheet_sync_queue (status, next_retry_at);
+  `);
+};
+
+const syncExpenseWithAppsScript = async (payload) => {
+  if (!isSheetsSyncEnabled()) {
+    return {
+      ok: true,
+      skipped: true,
+      warning: "Sincronización con Sheets desactivada por configuración",
+      result: null,
+    };
+  }
+
+  const appsScriptUrl = getAppsScriptUrl();
+  if (!appsScriptUrl) {
+    return {
+      ok: false,
+      skipped: false,
+      warning: MISSING_APPS_SCRIPT_MESSAGE,
+      result: null,
+    };
+  }
+
+  try {
+    const response = await fetch(appsScriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      redirect: "follow",
+    });
+
+    const text = await response.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = { raw: text };
+    }
+
+    if (!response.ok || json.error) {
+      const rawResponsePreview = String(text || "").slice(0, 180);
+      return {
+        ok: false,
+        skipped: false,
+        warning: json.error ?? `Apps Script status ${response.status}${rawResponsePreview ? `: ${rawResponsePreview}` : ""}`,
+        result: null,
+      };
+    }
+
+    return {
+      ok: true,
+      skipped: false,
+      warning: null,
+      result: json,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      skipped: false,
+      warning: error.message,
+      result: null,
+    };
+  }
+};
+
+const enqueueExpenseSheetSync = async (expenseId, payload, lastError) => {
+  await ensureExpenseSyncQueueTable();
+  await pool.query(
+    `INSERT INTO public.expense_sheet_sync_queue (expense_id, payload, status, retries, last_error, next_retry_at, updated_at)
+     VALUES ($1, $2::jsonb, 'pending', 1, $3, NOW() + INTERVAL '2 minutes', NOW())
+     ON CONFLICT (expense_id)
+     DO UPDATE SET
+       payload = EXCLUDED.payload,
+       status = 'pending',
+       retries = expense_sheet_sync_queue.retries + 1,
+       last_error = EXCLUDED.last_error,
+       next_retry_at = NOW() + ((LEAST(60, POWER(2, expense_sheet_sync_queue.retries + 1)))::text || ' minutes')::interval,
+       updated_at = NOW()`,
+    [expenseId, JSON.stringify(payload), lastError || "sync failed"],
+  );
+};
+
+const processPendingExpenseSync = async (limit = 20) => {
+  if (!isSheetsSyncEnabled()) {
+    return {
+      picked: 0,
+      synced: 0,
+      failed: 0,
+      skipped: true,
+    };
+  }
+
+  await ensureExpenseSyncQueueTable();
+
+  const queued = await pool.query(
+    `SELECT expense_id, payload, retries
+     FROM public.expense_sheet_sync_queue
+     WHERE status IN ('pending', 'failed')
+       AND next_retry_at <= NOW()
+     ORDER BY updated_at ASC
+     LIMIT $1`,
+    [limit],
+  );
+
+  let synced = 0;
+  let failed = 0;
+
+  for (const row of queued.rows) {
+    const expenseId = Number(row.expense_id);
+    const payload = row.payload || {};
+    const syncResult = await syncExpenseWithAppsScript(payload);
+
+    if (syncResult.ok) {
+      await pool.query(
+        `DELETE FROM public.expense_sheet_sync_queue WHERE expense_id = $1`,
+        [expenseId],
+      );
+      synced += 1;
+      continue;
+    }
+
+    await pool.query(
+      `UPDATE public.expense_sheet_sync_queue
+       SET status = 'failed',
+           retries = retries + 1,
+           last_error = $2,
+           next_retry_at = NOW() + ((LEAST(60, POWER(2, retries + 1)))::text || ' minutes')::interval,
+           updated_at = NOW()
+       WHERE expense_id = $1`,
+      [expenseId, syncResult.warning || "sync failed"],
+    );
+    failed += 1;
+  }
+
+  return {
+    picked: queued.rowCount,
+    synced,
+    failed,
+    skipped: false,
+  };
 };
 
 const addExpenseToSheet = async (req, res) => {
@@ -356,50 +520,6 @@ const addExpenseToSheet = async (req, res) => {
     const parsedDate = new Date(date);
     const expenseDate = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
 
-    const appsScriptUrl = getAppsScriptUrl();
-    const isProduction = process.env.NODE_ENV === "production";
-
-    let sheetResult = null;
-    let sheetWarning = null;
-
-    if (appsScriptUrl) {
-      try {
-        const response = await fetch(appsScriptUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ date, description, exchange, amount, paidBy, paymentMethod, notes }),
-          redirect: "follow",
-        });
-
-        const text = await response.text();
-        let json;
-        try {
-          json = JSON.parse(text);
-        } catch {
-          json = { raw: text };
-        }
-
-        if (!response.ok || json.error) {
-          const rawResponsePreview = String(text || "").slice(0, 180);
-          sheetWarning = json.error ?? `Apps Script status ${response.status}${rawResponsePreview ? `: ${rawResponsePreview}` : ""}`;
-        } else {
-          sheetResult = json;
-        }
-      } catch (error) {
-        sheetWarning = error.message;
-      }
-    } else {
-      console.warn("[addExpenseToSheet]", MISSING_APPS_SCRIPT_MESSAGE);
-      if (!isProduction) {
-        sheetWarning = MISSING_APPS_SCRIPT_MESSAGE;
-      }
-    }
-
-    if (isProduction && (sheetWarning || !sheetResult)) {
-      const productionMessage = `No se pudo sincronizar con Google Sheets. ${sheetWarning || MISSING_APPS_SCRIPT_MESSAGE}`;
-      return sendError(res, productionMessage, 502, sheetWarning || MISSING_APPS_SCRIPT_MESSAGE);
-    }
-
     const dbResult = await pool.query(
       `INSERT INTO public.expenses (type, amount, responsible, paymentMethod, exchange, date)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -414,19 +534,112 @@ const addExpenseToSheet = async (req, res) => {
       ]
     );
 
+    const expense = dbResult.rows[0];
+    const sheetPayload = {
+      date,
+      description: String(description).trim(),
+      exchange: String(exchange).trim(),
+      amount: amountNumber,
+      paidBy: String(paidBy).trim(),
+      paymentMethod: paymentMethod ? String(paymentMethod).trim() : null,
+      notes: notes ? String(notes).trim() : null,
+    };
+
+    const syncResult = await syncExpenseWithAppsScript(sheetPayload);
+    if (!syncResult.ok) {
+      await enqueueExpenseSheetSync(Number(expense.id), sheetPayload, syncResult.warning);
+    }
+
+    const backgroundRun = await processPendingExpenseSync(10);
+
+    const syncStatus = syncResult.skipped ? "disabled" : syncResult.ok ? "synced" : "pending";
+    const syncMessage = syncResult.skipped
+      ? "Guardado en BD. Sincronización con Sheets desactivada"
+      : syncResult.ok
+      ? "Google Sheets sincronizado"
+      : `Guardado en BD. Sheets pendiente de sincronización: ${syncResult.warning || "error desconocido"}`;
+
     return sendSuccess(
       res,
       {
-        expense: dbResult.rows[0],
-        sheetResult,
-        sheetWarning,
+        expense,
+        sync: {
+          status: syncStatus,
+          message: syncMessage,
+          warning: syncResult.warning,
+          result: syncResult.result,
+        },
+        retryStats: backgroundRun,
       },
-      sheetWarning ? "Gasto guardado con advertencia" : "Gasto agregado correctamente",
+      syncResult.skipped
+        ? "Gasto agregado. Sincronización desactivada"
+        : syncResult.ok
+        ? "Gasto agregado y sincronizado"
+        : "Gasto agregado. La sincronización quedó pendiente",
       201,
     );
   } catch (error) {
     console.error("[addExpenseToSheet] error:", error.message);
     return sendError(res, "Error al agregar gasto", 500, error.message);
+  }
+};
+
+const retryPendingExpenseSync = async (req, res) => {
+  try {
+    if (!isSheetsSyncEnabled()) {
+      return sendSuccess(
+        res,
+        { picked: 0, synced: 0, failed: 0, skipped: true },
+        "Sincronización desactivada por configuración",
+      );
+    }
+
+    const result = await processPendingExpenseSync(100);
+    return sendSuccess(res, result, "Procesamiento de pendientes finalizado");
+  } catch (error) {
+    console.error("[retryPendingExpenseSync] error:", error.message);
+    return sendError(res, "Error procesando pendientes de sincronización", 500, error.message);
+  }
+};
+
+const getExpenseSyncStatus = async (req, res) => {
+  try {
+    if (!isSheetsSyncEnabled()) {
+      return sendSuccess(
+        res,
+        {
+          enabled: false,
+          pending: 0,
+          failed: 0,
+          total: 0,
+        },
+        "Sincronización con Sheets desactivada",
+      );
+    }
+
+    await ensureExpenseSyncQueueTable();
+    const result = await pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'pending') AS pending,
+         COUNT(*) FILTER (WHERE status = 'failed') AS failed,
+         COUNT(*) AS total
+       FROM public.expense_sheet_sync_queue`,
+    );
+
+    const row = result.rows[0] || { pending: 0, failed: 0, total: 0 };
+    return sendSuccess(
+      res,
+      {
+        enabled: true,
+        pending: Number(row.pending || 0),
+        failed: Number(row.failed || 0),
+        total: Number(row.total || 0),
+      },
+      "Estado de sincronización obtenido",
+    );
+  } catch (error) {
+    console.error("[getExpenseSyncStatus] error:", error.message);
+    return sendError(res, "Error obteniendo estado de sincronización", 500, error.message);
   }
 };
 
@@ -453,4 +666,6 @@ module.exports = {
   testConnection,
   getTelegramMessages,
   addExpenseToSheet,
+  retryPendingExpenseSync,
+  getExpenseSyncStatus,
 };

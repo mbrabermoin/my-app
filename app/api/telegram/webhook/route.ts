@@ -164,6 +164,11 @@ function getConfiguredAppsScriptUrl() {
   return { url: null, envKey: null };
 }
 
+function isSheetsSyncEnabled() {
+  const raw = String(process.env.SHEETS_SYNC_ENABLED ?? "true").trim().toLowerCase();
+  return raw !== "false" && raw !== "0" && raw !== "off" && raw !== "no";
+}
+
 async function syncExpenseToGoogleSheet(payload: {
   date: string;
   description: string;
@@ -177,10 +182,19 @@ async function syncExpenseToGoogleSheet(payload: {
   sheetId?: string;
   notes?: string | null;
 }) {
+  if (!isSheetsSyncEnabled()) {
+    return {
+      ok: true,
+      skipped: true,
+      message: "Sincronización con Sheets desactivada por configuración",
+    };
+  }
+
   const { url } = getConfiguredAppsScriptUrl();
   if (!url) {
     return {
       ok: false,
+      skipped: false,
       message: "GOOGLE_APPS_SCRIPT_URL no configurada",
     };
   }
@@ -204,6 +218,7 @@ async function syncExpenseToGoogleSheet(payload: {
     if (!response.ok) {
       return {
         ok: false,
+        skipped: false,
         message: `Apps Script HTTP ${response.status}${text ? `: ${String(text).slice(0, 180)}` : ""}`,
       };
     }
@@ -211,17 +226,56 @@ async function syncExpenseToGoogleSheet(payload: {
     if (json && typeof json === "object" && "error" in json && (json as { error?: string }).error) {
       return {
         ok: false,
+        skipped: false,
         message: (json as { error: string }).error,
       };
     }
 
-    return { ok: true, message: "OK" };
+    return { ok: true, skipped: false, message: "OK" };
   } catch (error) {
     return {
       ok: false,
+      skipped: false,
       message: error instanceof Error ? error.message : "Error desconocido",
     };
   }
+}
+
+async function ensureExpenseSyncQueueTable(pool: Pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS public.expense_sheet_sync_queue (
+      expense_id BIGINT PRIMARY KEY,
+      payload JSONB NOT NULL,
+      status VARCHAR(16) NOT NULL DEFAULT 'pending',
+      retries INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      next_retry_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_expense_sheet_sync_queue_status_next_retry
+    ON public.expense_sheet_sync_queue (status, next_retry_at);
+  `);
+}
+
+async function enqueueExpenseSheetSync(pool: Pool, expenseId: number, payload: Record<string, unknown>, lastError: string) {
+  await ensureExpenseSyncQueueTable(pool);
+  await pool.query(
+    `INSERT INTO public.expense_sheet_sync_queue (expense_id, payload, status, retries, last_error, next_retry_at, updated_at)
+     VALUES ($1, $2::jsonb, 'pending', 1, $3, NOW() + INTERVAL '2 minutes', NOW())
+     ON CONFLICT (expense_id)
+     DO UPDATE SET
+       payload = EXCLUDED.payload,
+       status = 'pending',
+       retries = expense_sheet_sync_queue.retries + 1,
+       last_error = EXCLUDED.last_error,
+       next_retry_at = NOW() + ((LEAST(60, POWER(2, expense_sheet_sync_queue.retries + 1)))::text || ' minutes')::interval,
+       updated_at = NOW()`,
+    [expenseId, JSON.stringify(payload), lastError || "sync failed"],
+  );
 }
 
 const HELP_TEXT = `<b>Comandos disponibles:</b>
@@ -464,9 +518,11 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
     ],
   );
 
+  const expenseId = Number(result.rows[0].id);
+
   const todayIso = new Date().toISOString().slice(0, 10);
   const targetSheetName = sheetTab || input.travelDescription || tripName;
-  const sheetSync = await syncExpenseToGoogleSheet({
+  const sheetPayload = {
     date: todayIso,
     description: input.description.trim(),
     exchange: normalizedExchange,
@@ -478,10 +534,15 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
     sheetName: targetSheetName,
     sheetId: String(input.travelId),
     notes: input.notes ?? `Cargado por Telegram (${tripName})`,
-  });
+  };
+
+  const sheetSync = await syncExpenseToGoogleSheet(sheetPayload);
+  if (!sheetSync.ok) {
+    await enqueueExpenseSheetSync(pool, expenseId, sheetPayload, sheetSync.message);
+  }
 
   return {
-    expenseId: Number(result.rows[0].id),
+    expenseId,
     tripName,
     exchange: normalizedExchange,
     sheetSync,
