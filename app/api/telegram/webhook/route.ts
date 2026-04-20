@@ -39,7 +39,19 @@ type SaveExpenseInput = {
   paymentMethod?: string | null;
   exchange: string;
   travelId: string;
+  travelDescription?: string;
   notes?: string | null;
+};
+
+const TRIP_SHEET_NAME_BY_ID: Record<string, string> = {
+  "1": "Mardel a las Pampas 2024",
+  "2": "Cancun 2024",
+  "3": "Mardel 2025",
+  "4": "BRC 2025",
+  "5": "Carilo 2025",
+  "6": "Buzios 2025",
+  "7": "Panama 2026",
+  "8": "Next Trip",
 };
 
 async function sendTelegramApi(method: string, payload: Record<string, unknown>) {
@@ -169,6 +181,10 @@ async function syncExpenseToGoogleSheet(payload: {
   amount: number;
   paidBy: string;
   paymentMethod?: string | null;
+  travelId?: string;
+  travelDescription?: string;
+  sheetName?: string;
+  sheetId?: string;
   notes?: string | null;
 }) {
   const { url } = getConfiguredAppsScriptUrl();
@@ -458,6 +474,7 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
   );
 
   const todayIso = new Date().toISOString().slice(0, 10);
+  const targetSheetName = TRIP_SHEET_NAME_BY_ID[String(input.travelId)] || input.travelDescription || tripName;
   const sheetSync = await syncExpenseToGoogleSheet({
     date: todayIso,
     description: input.description.trim(),
@@ -465,6 +482,10 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
     amount: input.amount,
     paidBy: input.paidBy.trim(),
     paymentMethod: input.paymentMethod ? input.paymentMethod.trim() : null,
+    travelId: String(input.travelId),
+    travelDescription: input.travelDescription || tripName,
+    sheetName: targetSheetName,
+    sheetId: String(input.travelId),
     notes: input.notes ?? `Cargado por Telegram (${tripName})`,
   });
 
