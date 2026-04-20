@@ -291,7 +291,11 @@ Carga guiada paso a paso con botones.
 <b>/ayuda</b> — muestra este mensaje`;
 
 function normalizeExchange(raw: string) {
-  const value = String(raw || "").trim().toLowerCase();
+  const value = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
   if (value === "usd" || value === "dolar" || value === "dolares") {
     return "Dólar" as const;
   }
