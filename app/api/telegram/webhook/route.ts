@@ -26,6 +26,7 @@ type ExpenseSessionData = {
   paymentMethod?: "efectivo" | "tarjeta";
   exchange?: "pesos" | "reales" | "dolares";
   travelId?: string;
+  travelDescription?: string;
 };
 
 type TelegramInlineKeyboardMarkup = {
@@ -41,17 +42,6 @@ type SaveExpenseInput = {
   travelId: string;
   travelDescription?: string;
   notes?: string | null;
-};
-
-const TRIP_SHEET_NAME_BY_ID: Record<string, string> = {
-  "1": "Mardel a las Pampas 2024",
-  "2": "Cancun 2024",
-  "3": "Mardel 2025",
-  "4": "BRC 2025",
-  "5": "Carilo 2025",
-  "6": "Buzios 2025",
-  "7": "Panama 2026",
-  "8": "Next Trip",
 };
 
 async function sendTelegramApi(method: string, payload: Record<string, unknown>) {
@@ -474,7 +464,7 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
   );
 
   const todayIso = new Date().toISOString().slice(0, 10);
-  const targetSheetName = TRIP_SHEET_NAME_BY_ID[String(input.travelId)] || input.travelDescription || tripName;
+  const targetSheetName = input.travelDescription || tripName;
   const sheetSync = await syncExpenseToGoogleSheet({
     date: todayIso,
     description: input.description.trim(),
@@ -708,6 +698,7 @@ async function handleWizardCallback(
     const nextData = {
       ...session.data,
       travelId,
+      travelDescription: tripName,
     };
 
     await saveExpenseSession(pool, chatId, userId, "awaiting_confirmation", nextData);
@@ -742,6 +733,7 @@ async function handleWizardCallback(
       paymentMethod: data.paymentMethod,
       exchange: data.exchange,
       travelId: data.travelId,
+      travelDescription: data.travelDescription,
     });
 
     await clearExpenseSession(pool, chatId, userId);
