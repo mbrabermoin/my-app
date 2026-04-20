@@ -81,50 +81,53 @@ const StyledTripCardDate = styled.p`
 `;
 
 const StyledTripCardExchanges = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+`;
 
-  > :nth-child(4) {
-    grid-column: 1 / 2;
-  }
+const StyledExchangeGroup = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+`;
 
-  > :nth-child(5) {
-    grid-column: 2 / 3;
-  }
+const StyledGroupLabel = styled.span`
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: ${muted};
+  font-weight: 700;
+  display: block;
+  margin-bottom: 2px;
+`;
 
-  @media (max-width: 900px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-
-    > :nth-child(4),
-    > :nth-child(5) {
-      grid-column: auto;
-    }
-  }
-
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
-  }
+const StyledDivider = styled.div`
+  height: 1px;
+  background: rgba(0,0,0,0.07);
+  margin: 2px 0;
 `;
 
 const StyledExchangeItem = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 `;
 
 const StyledExchangeLabel = styled.span`
-  font-size: 10px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: ${muted};
   font-weight: 600;
+  white-space: nowrap;
 `;
 
 const StyledExchangeValue = styled.span`
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: ${terracotta};
+  white-space: nowrap;
 `;
 
 const TripsGallery: React.FC<TripsGalleryProps> = ({ trips, expenses, onSelectTrip }) => {
@@ -216,26 +219,33 @@ const TripsGallery: React.FC<TripsGalleryProps> = ({ trips, expenses, onSelectTr
               {formatTripDate(trip.startDate)} – {formatTripDate(trip.endDate)}
             </StyledTripCardDate>
             <StyledTripCardExchanges>
-              <StyledExchangeItem>
-                <StyledExchangeLabel>Gastos en pesos:</StyledExchangeLabel>
-                <StyledExchangeValue>$ {formatAmount(totals.pesos)}</StyledExchangeValue>
-              </StyledExchangeItem>
-              <StyledExchangeItem>
-                <StyledExchangeLabel>Gastos en reales:</StyledExchangeLabel>
-                <StyledExchangeValue>R$ {formatAmount(totals.reales)}</StyledExchangeValue>
-              </StyledExchangeItem>
-              <StyledExchangeItem>
-                <StyledExchangeLabel>Gastos en Dolares:</StyledExchangeLabel>
-                <StyledExchangeValue>U$D {formatAmount(totals.dolares)}</StyledExchangeValue>
-              </StyledExchangeItem>
-              <StyledExchangeItem>
-                <StyledExchangeLabel>Total en Pesos:</StyledExchangeLabel>
-                <StyledExchangeValue>$ {formatAmount(totalInPesos)}</StyledExchangeValue>
-              </StyledExchangeItem>
-              <StyledExchangeItem>
-                <StyledExchangeLabel>Total en Dolares:</StyledExchangeLabel>
-                <StyledExchangeValue>U$D {formatAmount(totalInDollars)}</StyledExchangeValue>
-              </StyledExchangeItem>
+              <StyledGroupLabel>Gastos</StyledGroupLabel>
+              <StyledExchangeGroup>
+                <StyledExchangeItem>
+                  <StyledExchangeLabel>Pesos</StyledExchangeLabel>
+                  <StyledExchangeValue>$ {formatAmount(totals.pesos)}</StyledExchangeValue>
+                </StyledExchangeItem>
+                <StyledExchangeItem>
+                  <StyledExchangeLabel>Reales</StyledExchangeLabel>
+                  <StyledExchangeValue>R$ {formatAmount(totals.reales)}</StyledExchangeValue>
+                </StyledExchangeItem>
+                <StyledExchangeItem>
+                  <StyledExchangeLabel>Dólares</StyledExchangeLabel>
+                  <StyledExchangeValue>U$D {formatAmount(totals.dolares)}</StyledExchangeValue>
+                </StyledExchangeItem>
+              </StyledExchangeGroup>
+              <StyledDivider />
+              <StyledGroupLabel>Total</StyledGroupLabel>
+              <StyledExchangeGroup>
+                <StyledExchangeItem>
+                  <StyledExchangeLabel>En pesos</StyledExchangeLabel>
+                  <StyledExchangeValue>$ {formatAmount(totalInPesos)}</StyledExchangeValue>
+                </StyledExchangeItem>
+                <StyledExchangeItem>
+                  <StyledExchangeLabel>En dólares</StyledExchangeLabel>
+                  <StyledExchangeValue>U$D {formatAmount(totalInDollars)}</StyledExchangeValue>
+                </StyledExchangeItem>
+              </StyledExchangeGroup>
             </StyledTripCardExchanges>
           </StyledTripCard>
         );
