@@ -434,7 +434,7 @@ async function sendExpensesByTrip(pool: Pool, chatId: number | string, travelId:
 
 async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
   const tripCheck = await pool.query(
-    `SELECT id, destiny FROM public.trips WHERE id = $1`,
+    `SELECT id, destiny, "sheetTab" AS "sheetTab" FROM public.trips WHERE id = $1`,
     [input.travelId],
   );
 
@@ -443,6 +443,7 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
   }
 
   const tripName: string = tripCheck.rows[0].destiny;
+  const sheetTab: string | null = tripCheck.rows[0].sheetTab ?? null;
   const normalizedExchange = normalizeExchange(input.exchange);
   if (!normalizedExchange) {
     throw new Error(`Moneda inválida: ${input.exchange}`);
@@ -464,7 +465,7 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
   );
 
   const todayIso = new Date().toISOString().slice(0, 10);
-  const targetSheetName = input.travelDescription || tripName;
+  const targetSheetName = sheetTab || input.travelDescription || tripName;
   const sheetSync = await syncExpenseToGoogleSheet({
     date: todayIso,
     description: input.description.trim(),

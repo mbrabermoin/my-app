@@ -73,6 +73,7 @@ const getTrips = async (req, res) => {
     const startDateColumn = pickColumn("startDate");
     const endDateColumn = pickColumn("endDate");
     const paidByColumn = pickColumn("paidBy");
+    const sheetTabColumn = pickColumn("sheetTab", "sheettab", "sheet_tab");
 
     const selectedColumns = [];
     if (idColumn) selectedColumns.push(`${idColumn} AS id`);
@@ -82,6 +83,7 @@ const getTrips = async (req, res) => {
     if (startDateColumn) selectedColumns.push(`${startDateColumn} AS "startDate"`);
     if (endDateColumn) selectedColumns.push(`${endDateColumn} AS "endDate"`);
     if (paidByColumn) selectedColumns.push(`${paidByColumn} AS "paidBy"`);
+    if (sheetTabColumn) selectedColumns.push(`${sheetTabColumn} AS "sheetTab"`);
 
     const quoteIdent = (value) => `"${value.replace(/"/g, '""')}"`;
     const tableRef = `${quoteIdent(tableSchema)}.${quoteIdent("trips")}`;
