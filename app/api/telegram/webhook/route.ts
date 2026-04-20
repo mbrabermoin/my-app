@@ -24,7 +24,7 @@ type ExpenseSessionData = {
   description?: string;
   paidBy?: string;
   paymentMethod?: "efectivo" | "tarjeta";
-  exchange?: "pesos" | "reales" | "dolares";
+  exchange?: "Pesos" | "Real" | "Dólar";
   travelId?: string;
   travelDescription?: string;
 };
@@ -229,7 +229,7 @@ const HELP_TEXT = `<b>Comandos disponibles:</b>
 <b>/nuevo</b>
 Carga guiada paso a paso con botones.
 
-<b>Flujo:</b> monto → descripción → quién pagó → método de pago → moneda → viaje → confirmar
+<b>Flujo:</b> viaje → monto → moneda → descripción → quién pagó → método de pago → confirmar
 
 <b>/gastos</b> — elegís un viaje y te muestra el listado de gastos
 <b>/viajes</b> — lista los viajes disponibles
@@ -239,13 +239,13 @@ Carga guiada paso a paso con botones.
 function normalizeExchange(raw: string) {
   const value = String(raw || "").trim().toLowerCase();
   if (value === "usd" || value === "dolar" || value === "dolares") {
-    return "dolares" as const;
+    return "Dólar" as const;
   }
   if (value === "real" || value === "reales") {
-    return "reales" as const;
+    return "Real" as const;
   }
   if (value === "peso" || value === "pesos") {
-    return "pesos" as const;
+    return "Pesos" as const;
   }
   return null;
 }
@@ -488,12 +488,23 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
   };
 }
 
-async function startWizard(pool: Pool, chatId: string, userId: string) {
-  await saveExpenseSession(pool, chatId, userId, "awaiting_amount", {});
+async function sendExpenseConfirmation(chatId: string, data: ExpenseSessionData) {
   await sendTelegramMessage(
     chatId,
-    "Perfecto, empecemos. Enviame el monto del gasto (ej: 1500 o 1500.50)",
+    `<b>Confirmá el gasto:</b>\n\n📝 ${data.description}\n💰 ${Number(data.amount ?? 0).toFixed(2)} ${data.exchange}\n👤 ${data.paidBy}\n💳 ${data.paymentMethod}\n✈️ ${data.travelDescription}`,
+    confirmationKeyboard(),
   );
+}
+
+async function startWizard(pool: Pool, chatId: string, userId: string) {
+  await saveExpenseSession(pool, chatId, userId, "awaiting_trip", {});
+  const keyboard = await tripKeyboard(pool);
+  if (!keyboard) {
+    await sendTelegramMessage(chatId, "No hay viajes disponibles para asociar el gasto.");
+    return;
+  }
+
+  await sendTelegramMessage(chatId, "Perfecto, empecemos. Elegí el viaje:", keyboard);
 }
 
 async function handleWizardTextStep(
@@ -521,11 +532,11 @@ async function handleWizardTextStep(
       return true;
     }
 
-    await saveExpenseSession(pool, chatId, userId, "awaiting_description", {
+    await saveExpenseSession(pool, chatId, userId, "awaiting_currency", {
       ...session.data,
       amount,
     });
-    await sendTelegramMessage(chatId, "Genial. Ahora enviame la descripción del gasto.");
+    await sendTelegramMessage(chatId, "En que moneda?", currencyKeyboard());
     return true;
   }
 
@@ -534,7 +545,7 @@ async function handleWizardTextStep(
       ...session.data,
       description: text,
     });
-    await sendTelegramMessage(chatId, "Quién pagó? Elegí una opción:", paidByKeyboard());
+    await sendTelegramMessage(chatId, "Quién pagó?", paidByKeyboard());
     return true;
   }
 
@@ -543,7 +554,7 @@ async function handleWizardTextStep(
       ...session.data,
       paidBy: text,
     });
-    await sendTelegramMessage(chatId, "Elegí el método de pago:", paymentMethodKeyboard());
+    await sendTelegramMessage(chatId, "Como pagó?", paymentMethodKeyboard());
     return true;
   }
 
@@ -610,17 +621,9 @@ async function handleWizardCallback(
       ...session.data,
       exchange,
     };
-    await saveExpenseSession(pool, chatId, userId, "awaiting_trip", nextData);
+    await saveExpenseSession(pool, chatId, userId, "awaiting_description", nextData);
     await answerCallbackQuery(callbackQueryId, "Moneda guardada");
-
-    const keyboard = await tripKeyboard(pool);
-    if (!keyboard) {
-      await clearExpenseSession(pool, chatId, userId);
-      await sendTelegramMessage(chatId, "No hay viajes disponibles para asociar el gasto.");
-      return;
-    }
-
-    await sendTelegramMessage(chatId, "Elegí el viaje:", keyboard);
+    await sendTelegramMessage(chatId, "Que se pagó?");
     return;
   }
 
@@ -631,18 +634,20 @@ async function handleWizardCallback(
     }
 
     const selected = (callbackData.split(":")[1] ?? "").trim().toLowerCase();
-    const paymentMethod = selected === "efectivo" || selected === "tarjeta" ? selected : null;
+    const paymentMethod: ExpenseSessionData["paymentMethod"] =
+      selected === "efectivo" || selected === "tarjeta" ? selected : undefined;
     if (!paymentMethod) {
       await answerCallbackQuery(callbackQueryId, "Método inválido");
       return;
     }
 
-    await saveExpenseSession(pool, chatId, userId, "awaiting_currency", {
+    const nextData = {
       ...session.data,
       paymentMethod,
-    });
+    };
+    await saveExpenseSession(pool, chatId, userId, "awaiting_confirmation", nextData);
     await answerCallbackQuery(callbackQueryId, "Método guardado");
-    await sendTelegramMessage(chatId, "Elegí la moneda:", currencyKeyboard());
+    await sendExpenseConfirmation(chatId, nextData);
     return;
   }
 
@@ -702,14 +707,9 @@ async function handleWizardCallback(
       travelDescription: tripName,
     };
 
-    await saveExpenseSession(pool, chatId, userId, "awaiting_confirmation", nextData);
+    await saveExpenseSession(pool, chatId, userId, "awaiting_amount", nextData);
     await answerCallbackQuery(callbackQueryId, "Viaje guardado");
-
-    await sendTelegramMessage(
-      chatId,
-      `<b>Confirmá el gasto:</b>\n\n📝 ${nextData.description}\n💰 ${Number(nextData.amount ?? 0).toFixed(2)} ${nextData.exchange}\n👤 ${nextData.paidBy}\n💳 ${nextData.paymentMethod}\n✈️ ${tripName}`,
-      confirmationKeyboard(),
-    );
+    await sendTelegramMessage(chatId, "Cuanto se gastó? (ej: 1500 o 1500.50)");
     return;
   }
 
