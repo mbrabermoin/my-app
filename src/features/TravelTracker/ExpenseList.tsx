@@ -48,16 +48,6 @@ import {
   StyledPaginationInfo,
 } from "./ExpenseList.styles";
 
-type SyncStatusApiResponse = {
-  success?: boolean;
-  data?: {
-    enabled?: boolean;
-    pending?: number;
-    failed?: number;
-  };
-  message?: string;
-};
-
 const ExpenseList: React.FC = () => {
   const router = useRouter();
   const {
@@ -70,37 +60,6 @@ const ExpenseList: React.FC = () => {
     loadExpenses,
     handleAddExpense,
   } = useTripsAndExpenses();
-
-  const [syncInfo, setSyncInfo] = React.useState({
-    enabled: true,
-    pending: 0,
-    failed: 0,
-    loading: true,
-  });
-
-  const loadSyncStatus = React.useCallback(async () => {
-    try {
-      const response = await fetch(apiUrl("/api/expenses/sheet/status"));
-      const data = (await response.json()) as SyncStatusApiResponse;
-      if (!response.ok || !data.success) {
-        setSyncInfo({ enabled: true, pending: 0, failed: 0, loading: false });
-        return;
-      }
-
-      setSyncInfo({
-        enabled: Boolean(data.data?.enabled),
-        pending: Number(data.data?.pending || 0),
-        failed: Number(data.data?.failed || 0),
-        loading: false,
-      });
-    } catch {
-      setSyncInfo({ enabled: true, pending: 0, failed: 0, loading: false });
-    }
-  }, []);
-
-  React.useEffect(() => {
-    loadSyncStatus();
-  }, [loadSyncStatus]);
 
   const { currentPage, hasNextPage, hasPrevPage } = pagination;
   const [selectedResponsible, setSelectedResponsible] = React.useState<string | null>(null);
@@ -192,20 +151,24 @@ const ExpenseList: React.FC = () => {
   const diff = maxPayer && minPayer ? round2(maxPayer[1] - minPayer[1]) : 0;
 
   const handleSyncClick = async () => {
+    const confirmed = window.confirm("Esto va a reemplazar la BD con los datos actuales del Google Sheet. ¿Continuar?");
+    if (!confirmed) {
+      return;
+    }
+
     try {
-      const response = await fetch(apiUrl("/api/expenses/sheet/retry-pending"), {
+      const response = await fetch(apiUrl("/api/admin/sync-sheets"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
-        alert("Error: " + (data.message || "No se pudo procesar pendientes"));
+        alert("Error: " + (data.message || "No se pudo importar desde Sheet"));
         return;
       }
 
-      const stats = data?.data || {};
-      alert(`Pendientes procesados: ${stats.picked || 0}\nSincronizados: ${stats.synced || 0}\nCon error: ${stats.failed || 0}`);
-      await loadSyncStatus();
+      alert("BD actualizada desde Google Sheet.");
+      await loadExpenses(1);
     } catch {
       alert("Cannot connect with server. Please try again later.");
     }
@@ -213,7 +176,6 @@ const ExpenseList: React.FC = () => {
 
   const handleExpenseAddedWithSyncRefresh = () => {
     handleAddExpense();
-    loadSyncStatus();
   };
 
   const renderCards = () => {
@@ -292,23 +254,11 @@ const ExpenseList: React.FC = () => {
                   {selectedTrip.destiny} · {formatTripDate(selectedTrip.startDate)} – {formatTripDate(selectedTrip.endDate)}
                 </p>
               )}
-              <p>
-                {syncInfo.loading
-                  ? "Sync: revisando estado..."
-                  : !syncInfo.enabled
-                  ? "Sync: desactivada"
-                  : syncInfo.pending > 0
-                  ? `Sync: ${syncInfo.pending} pendiente(s)${syncInfo.failed > 0 ? `, ${syncInfo.failed} con error` : ""}`
-                  : "Sync: al día"}
-              </p>
+              <p>Fuente de verdad: Google Sheet</p>
             </StyledTitleGroup>
             <StyledHeaderActions>
               <StyledBackButton onClick={() => router.push("/")}>← Volver</StyledBackButton>
-              {syncInfo.enabled && syncInfo.pending > 0 && (
-                <StyledSyncButton onClick={handleSyncClick}>
-                  ⟳ Reintentar Sync ({syncInfo.pending})
-                </StyledSyncButton>
-              )}
+              <StyledSyncButton onClick={handleSyncClick}>⟳ Importar desde Sheet</StyledSyncButton>
               <AddExpenseModal onAddExpense={handleExpenseAddedWithSyncRefresh} />
             </StyledHeaderActions>
           </StyledHeaderTop>
