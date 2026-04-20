@@ -678,7 +678,7 @@ async function handleWizardCallback(
       paidBy: mappedPaidBy,
     });
     await answerCallbackQuery(callbackQueryId, "Quién pagó guardado");
-    await sendTelegramMessage(chatId, "Elegí el método de pago:", paymentMethodKeyboard());
+    await sendTelegramMessage(chatId, "Como se pagó?", paymentMethodKeyboard());
     return;
   }
 
