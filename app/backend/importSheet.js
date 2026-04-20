@@ -15,14 +15,43 @@ function parseDate(dateStr) {
 }
 
 function cleanAmount(amountStr) {
-  if (!amountStr || amountStr.trim() === '') return 0;
-  let cleaned = amountStr.replace(/[$\s]/g, '');
-  if (/\.\d{2}$/.test(cleaned)) {
-    cleaned = cleaned.replace(/,/g, '');
-  } else if (/,\d{2}$/.test(cleaned)) {
-    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  if (amountStr === null || amountStr === undefined) return 0;
+
+  const raw = String(amountStr).trim();
+  if (!raw) return 0;
+
+  // Keep only numeric separators and sign; Excel exports may include currency symbols/spaces.
+  let cleaned = raw
+    .replace(/\u00A0/g, "")
+    .replace(/[^0-9,.-]/g, "")
+    .replace(/(?!^)-/g, "");
+
+  const hasComma = cleaned.includes(",");
+  const hasDot = cleaned.includes(".");
+
+  if (hasComma && hasDot) {
+    // When both separators exist, assume the last one is decimal separator.
+    if (cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")) {
+      cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  } else if (hasComma) {
+    // Single comma: decimal when 1-2 digits at the end, otherwise thousand separator.
+    if (/,\d{1,2}$/.test(cleaned)) {
+      cleaned = cleaned.replace(/,/g, ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  } else if (hasDot) {
+    // Single dot: decimal when 1-2 digits at the end, otherwise thousand separator.
+    if (!/\.\d{1,2}$/.test(cleaned)) {
+      cleaned = cleaned.replace(/\./g, "");
+    }
   }
-  return parseFloat(cleaned) || 0;
+
+  const parsed = Number.parseFloat(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function normalizeKey(value) {
