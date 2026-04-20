@@ -46,6 +46,13 @@ import {
   StyledPaginationContainer,
   StyledPaginationButton,
   StyledPaginationInfo,
+  StyledSuccessPopup,
+  StyledConfirmBackdrop,
+  StyledConfirmBox,
+  StyledConfirmTitle,
+  StyledConfirmButtons,
+  StyledConfirmCancelBtn,
+  StyledConfirmOkBtn,
 } from "./ExpenseList.styles";
 
 const ExpenseList: React.FC = () => {
@@ -63,7 +70,16 @@ const ExpenseList: React.FC = () => {
 
   const { currentPage, hasNextPage, hasPrevPage } = pagination;
   const [selectedResponsible, setSelectedResponsible] = React.useState<string | null>(null);
+  const [toast, setToast] = React.useState<{ message: string; isError: boolean } | null>(null);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
   const isViewingAllTrips = selectedTrip === null;
+
+  const showToast = React.useCallback((message: string, isError = false) => {
+    setToast({ message, isError });
+    window.setTimeout(() => {
+      setToast(null);
+    }, 2600);
+  }, []);
 
   const dolarPesosExchange = selectedTrip?.dolarPesosExchange ?? 1;
   const dolarRealExchange = selectedTrip?.dolarRealExchange ?? 1;
@@ -150,12 +166,7 @@ const ExpenseList: React.FC = () => {
     : null;
   const diff = maxPayer && minPayer ? round2(maxPayer[1] - minPayer[1]) : 0;
 
-  const handleSyncClick = async () => {
-    const confirmed = window.confirm("Esto va a reemplazar la BD con los datos actuales del Google Sheet. ¿Continuar?");
-    if (!confirmed) {
-      return;
-    }
-
+  const doSync = async () => {
     try {
       const response = await fetch(apiUrl("/api/admin/sync-sheets"), {
         method: "POST",
@@ -163,16 +174,18 @@ const ExpenseList: React.FC = () => {
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
-        alert("Error: " + (data.message || "No se pudo importar desde Sheet"));
+        showToast("Error: " + (data.message || "No se pudo importar desde Sheet"), true);
         return;
       }
 
-      alert("BD actualizada desde Google Sheet.");
+      showToast("BD actualizada desde Google Sheet.");
       await loadExpenses(1);
     } catch {
-      alert("Cannot connect with server. Please try again later.");
+      showToast("Cannot connect with server. Please try again later.", true);
     }
   };
+
+  const handleSyncClick = () => setConfirmOpen(true);
 
   const handleExpenseAddedWithSyncRefresh = () => {
     handleAddExpense();
@@ -241,6 +254,30 @@ const ExpenseList: React.FC = () => {
   return (
     <StyledPage>
       <TravelFonts />
+
+      {toast && <StyledSuccessPopup $isError={toast.isError}>{toast.message}</StyledSuccessPopup>}
+      {confirmOpen && (
+        <StyledConfirmBackdrop onClick={() => setConfirmOpen(false)}>
+          <StyledConfirmBox onClick={(e) => e.stopPropagation()}>
+            <StyledConfirmTitle>
+              Esto va a reemplazar la BD con los datos actuales del Google Sheet. ¿Continuar?
+            </StyledConfirmTitle>
+            <StyledConfirmButtons>
+              <StyledConfirmCancelBtn onClick={() => setConfirmOpen(false)}>
+                Cancelar
+              </StyledConfirmCancelBtn>
+              <StyledConfirmOkBtn
+                onClick={() => {
+                  setConfirmOpen(false);
+                  doSync();
+                }}
+              >
+                Confirmar
+              </StyledConfirmOkBtn>
+            </StyledConfirmButtons>
+          </StyledConfirmBox>
+        </StyledConfirmBackdrop>
+      )}
 
       {/* ── HEADER ── */}
       <StyledPageHeader>

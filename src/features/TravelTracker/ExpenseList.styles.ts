@@ -1,4 +1,4 @@
-import styled, { createGlobalStyle } from "styled-components";
+import styled, { createGlobalStyle, keyframes } from "styled-components";
 
 export const TravelFonts = createGlobalStyle`
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap');
@@ -488,6 +488,116 @@ export const StyledPaginationInfo = styled.span`
   color: ${muted};
   font-size: 13px;
   font-weight: 500;
+`;
+
+const toastIn = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+`;
+
+export const StyledSuccessPopup = styled.div<{ $isError?: boolean }>`
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 10000;
+  background: ${(p) => (p.$isError ? "linear-gradient(145deg, #fff2ee, #fde9e2)" : "linear-gradient(145deg, #edf8f1, #e4f4ea)")};
+  color: ${(p) => (p.$isError ? "#9b2f18" : "#1f6b3b")};
+  border: 1px solid ${(p) => (p.$isError ? "rgba(155, 47, 24, 0.35)" : "rgba(44, 140, 82, 0.35)")};
+  box-shadow: ${(p) => (p.$isError ? "0 14px 36px rgba(155, 47, 24, 0.18)" : "0 14px 36px rgba(31, 107, 59, 0.22)")};
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  animation: ${toastIn} 220ms ease-out;
+
+  @media (max-width: 640px) {
+    right: 14px;
+    left: 14px;
+    bottom: 14px;
+    text-align: center;
+  }
+`;
+
+/* ── Confirm modal ── */
+const backdropIn = keyframes`
+  from { opacity: 0; }
+  to   { opacity: 1; }
+`;
+
+const modalIn = keyframes`
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+`;
+
+export const StyledConfirmBackdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: ${backdropIn} 180ms ease-out;
+`;
+
+export const StyledConfirmBox = styled.div`
+  background: #fffdf8;
+  border-radius: 18px;
+  padding: 32px 28px 24px;
+  max-width: 400px;
+  width: calc(100% - 48px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+  animation: ${modalIn} 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+`;
+
+export const StyledConfirmTitle = styled.p`
+  font-size: 15px;
+  font-weight: 600;
+  color: #2e2c28;
+  line-height: 1.5;
+  margin: 0;
+`;
+
+export const StyledConfirmButtons = styled.div`
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+`;
+
+export const StyledConfirmCancelBtn = styled.button`
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+  transition: background 140ms;
+  &:hover { background: #f3f0ea; }
+`;
+
+export const StyledConfirmOkBtn = styled.button`
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(145deg, #e05a2b, #c94a1a);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: filter 140ms;
+  &:hover { filter: brightness(1.07); }
 `;
 
 /* ── kept for compatibility (AddExpenseModal may use these) ── */
