@@ -15,6 +15,7 @@ type SessionStep =
   | "awaiting_paid_by"
   | "awaiting_paid_by_custom"
   | "awaiting_payment_method"
+  | "awaiting_date"
   | "awaiting_currency"
   | "awaiting_trip"
   | "awaiting_confirmation";
@@ -25,6 +26,7 @@ type ExpenseSessionData = {
   paidBy?: string;
   paymentMethod?: "efectivo" | "tarjeta";
   exchange?: "Pesos" | "Real" | "Dólar";
+  date?: string;
   travelId?: string;
   travelDescription?: string;
 };
@@ -39,6 +41,7 @@ type SaveExpenseInput = {
   paidBy: string;
   paymentMethod?: string | null;
   exchange: string;
+  date: string;
   travelId: string;
   travelDescription?: string;
   notes?: string | null;
@@ -283,7 +286,7 @@ const HELP_TEXT = `<b>Comandos disponibles:</b>
 <b>/nuevo</b>
 Carga guiada paso a paso con botones.
 
-<b>Flujo:</b> viaje → monto → moneda → descripción → quién pagó → método de pago → confirmar
+<b>Flujo:</b> viaje → monto → moneda → descripción → quién pagó → método de pago → fecha → confirmar
 
 <b>/gastos</b> — elegís un viaje y te muestra el listado de gastos
 <b>/viajes</b> — lista los viajes disponibles
@@ -414,6 +417,57 @@ function formatExpenseDate(value: string | Date | null | undefined) {
   }).format(date);
 }
 
+function parseExpenseDateInput(value: string) {
+  const raw = value.trim();
+  if (!raw) {
+    return null;
+  }
+
+  const lowered = raw.toLowerCase();
+  const now = new Date();
+
+  if (lowered === "hoy") {
+    return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())).toISOString().slice(0, 10);
+  }
+
+  if (lowered === "ayer") {
+    return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() - 1)).toISOString().slice(0, 10);
+  }
+
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const day = Number.parseInt(slashMatch[1], 10);
+    const month = Number.parseInt(slashMatch[2], 10);
+    const year = Number.parseInt(slashMatch[3], 10);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (
+      parsed.getUTCFullYear() === year
+      && parsed.getUTCMonth() === month - 1
+      && parsed.getUTCDate() === day
+    ) {
+      return parsed.toISOString().slice(0, 10);
+    }
+    return null;
+  }
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const year = Number.parseInt(isoMatch[1], 10);
+    const month = Number.parseInt(isoMatch[2], 10);
+    const day = Number.parseInt(isoMatch[3], 10);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (
+      parsed.getUTCFullYear() === year
+      && parsed.getUTCMonth() === month - 1
+      && parsed.getUTCDate() === day
+    ) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  }
+
+  return null;
+}
+
 function formatExpenseAmount(value: number | string | null | undefined) {
   const amount = Number(value);
   if (!Number.isFinite(amount)) {
@@ -509,7 +563,7 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
 
   const result = await pool.query(
     `INSERT INTO public.expenses (type, amount, responsible, paymentMethod, exchange, travelId, travelDescription, date)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id`,
     [
       input.description.trim(),
@@ -519,15 +573,15 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
       normalizedExchange,
       input.travelId,
       tripName,
+      input.date,
     ],
   );
 
   const expenseId = Number(result.rows[0].id);
 
-  const todayIso = new Date().toISOString().slice(0, 10);
   const targetSheetName = sheetTab || input.travelDescription || tripName;
   const sheetPayload = {
-    date: todayIso,
+    date: input.date,
     description: input.description.trim(),
     exchange: normalizedExchange,
     amount: input.amount,
@@ -556,7 +610,7 @@ async function saveExpenseAndSync(pool: Pool, input: SaveExpenseInput) {
 async function sendExpenseConfirmation(chatId: string, data: ExpenseSessionData) {
   await sendTelegramMessage(
     chatId,
-    `<b>Confirmá el gasto:</b>\n\n📝 ${data.description}\n💰 ${Number(data.amount ?? 0).toFixed(2)} ${data.exchange}\n👤 ${data.paidBy}\n💳 ${data.paymentMethod}\n✈️ ${data.travelDescription}`,
+    `<b>Confirmá el gasto:</b>\n\n📝 ${data.description}\n💰 ${Number(data.amount ?? 0).toFixed(2)} ${data.exchange}\n👤 ${data.paidBy}\n💳 ${data.paymentMethod}\n📅 ${formatExpenseDate(data.date)}\n✈️ ${data.travelDescription}`,
     confirmationKeyboard(),
   );
 }
@@ -620,6 +674,22 @@ async function handleWizardTextStep(
       paidBy: text,
     });
     await sendTelegramMessage(chatId, "Como pagó?", paymentMethodKeyboard());
+    return true;
+  }
+
+  if (session.step === "awaiting_date") {
+    const parsedDate = parseExpenseDateInput(text);
+    if (!parsedDate) {
+      await sendTelegramMessage(chatId, "Fecha inválida. Probá con hoy, ayer, DD/MM/AAAA o AAAA-MM-DD.");
+      return true;
+    }
+
+    const nextData = {
+      ...session.data,
+      date: parsedDate,
+    };
+    await saveExpenseSession(pool, chatId, userId, "awaiting_confirmation", nextData);
+    await sendExpenseConfirmation(chatId, nextData);
     return true;
   }
 
@@ -710,9 +780,9 @@ async function handleWizardCallback(
       ...session.data,
       paymentMethod,
     };
-    await saveExpenseSession(pool, chatId, userId, "awaiting_confirmation", nextData);
+    await saveExpenseSession(pool, chatId, userId, "awaiting_date", nextData);
     await answerCallbackQuery(callbackQueryId, "Método guardado");
-    await sendExpenseConfirmation(chatId, nextData);
+    await sendTelegramMessage(chatId, "Qué fecha le pongo? Podés escribir hoy, ayer, DD/MM/AAAA o AAAA-MM-DD.");
     return;
   }
 
@@ -785,7 +855,7 @@ async function handleWizardCallback(
     }
 
     const data = session.data;
-    if (!data.amount || !data.description || !data.paidBy || !data.paymentMethod || !data.exchange || !data.travelId) {
+    if (!data.amount || !data.description || !data.paidBy || !data.paymentMethod || !data.exchange || !data.travelId || !data.date) {
       await answerCallbackQuery(callbackQueryId, "Faltan datos en la sesión");
       await sendTelegramMessage(chatId, "No pude confirmar porque faltan datos. Escribí /nuevo para reiniciar.");
       await clearExpenseSession(pool, chatId, userId);
@@ -798,6 +868,7 @@ async function handleWizardCallback(
       paidBy: data.paidBy,
       paymentMethod: data.paymentMethod,
       exchange: data.exchange,
+      date: data.date,
       travelId: data.travelId,
       travelDescription: data.travelDescription,
     });
@@ -811,7 +882,7 @@ async function handleWizardCallback(
 
     await sendTelegramMessage(
       chatId,
-      `✅ <b>Gasto agregado</b> (#${saved.expenseId})\n\n📝 ${data.description}\n💰 ${Number(data.amount).toFixed(2)} ${saved.exchange}\n👤 ${data.paidBy}\n💳 ${data.paymentMethod}\n✈️ ${saved.tripName}\n${syncLine}`,
+      `✅ <b>Gasto agregado</b> (#${saved.expenseId})\n\n📝 ${data.description}\n💰 ${Number(data.amount).toFixed(2)} ${saved.exchange}\n👤 ${data.paidBy}\n💳 ${data.paymentMethod}\n📅 ${formatExpenseDate(data.date)}\n✈️ ${saved.tripName}\n${syncLine}`,
     );
     return;
   }
