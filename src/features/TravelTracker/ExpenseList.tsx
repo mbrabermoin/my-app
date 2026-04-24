@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import AddExpenseModal from "./components/AddExpenseModal";
 import TripsGallery from "./components/TripsGallery";
 import { useTripsAndExpenses } from "./useTripsAndExpenses";
@@ -29,6 +30,7 @@ import {
   StyledTotalCard,
   StyledTotalCardLabel,
   StyledTotalCardValue,
+  StyledTotalValueSkeleton,
   StyledTableWrap,
   StyledExpenseTable,
   StyledTableHeader,
@@ -56,6 +58,13 @@ import {
 } from "./ExpenseList.styles";
 
 const ExpenseList: React.FC = () => {
+  const LazyExpenseStatsSummary = React.useMemo(
+    () => dynamic(() => import("./components/ExpenseStatsSummary"), {
+      loading: () => null,
+    }),
+    [],
+  );
+
   const router = useRouter();
   const {
     expenses,
@@ -65,14 +74,25 @@ const ExpenseList: React.FC = () => {
     setSelectedTrip,
     pagination,
     loadExpenses,
-    handleAddExpense,
+    allExpensesTotals,
   } = useTripsAndExpenses();
 
-  const { currentPage, hasNextPage, hasPrevPage } = pagination;
+  const { currentPage, hasNextPage, hasPrevPage, totalExpenses, totalCount } = pagination;
   const [selectedResponsible, setSelectedResponsible] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState<{ message: string; isError: boolean } | null>(null);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const isViewingAllTrips = selectedTrip === null;
+
+  React.useEffect(() => {
+    if (!isViewingAllTrips) {
+      loadExpenses(1, selectedResponsible);
+    }
+  }, [selectedResponsible, isViewingAllTrips, selectedTrip?.id]);
+
+  // Reset responsible filter when trip changes
+  React.useEffect(() => {
+    setSelectedResponsible(null);
+  }, [selectedTrip?.id]);
 
   const showToast = React.useCallback((message: string, isError = false) => {
     setToast({ message, isError });
@@ -127,44 +147,23 @@ const ExpenseList: React.FC = () => {
     );
   };
 
+  const totals = allExpensesTotals;
+
   const responsibles = Array.from(
-    new Set(expenses.map((e) => e.responsible).filter(Boolean)),
+    new Set([...Object.keys(totals.perPersonUsd || {}), ...expenses.map((e) => e.responsible)].filter(Boolean)),
   ).sort();
 
-  const filteredExpenses = selectedResponsible
-    ? expenses.filter((e) => e.responsible === selectedResponsible)
-    : expenses;
-
-  const expensesWithTotals = filteredExpenses.map((expense) => ({
+  const expensesWithTotals = expenses.map((expense) => ({
     ...expense,
     displayExchange: getExchange(expense.exchange),
     localCurrencyAmount: getLocalCurrencyAmount(expense.amount, expense.exchange),
-    dollarAmount: getDollarAmount(expense.amount, expense.exchange),
+    dollarAmount:
+      Number.isFinite(expense.dollarAmount) && expense.dollarAmount > 0
+        ? expense.dollarAmount
+        : getDollarAmount(expense.amount, expense.exchange),
   }));
 
-  const totals = expensesWithTotals.reduce(
-    (acc, e) => ({
-      localCurrencyAmount: round2(acc.localCurrencyAmount + e.localCurrencyAmount),
-      dollarAmount: round2(acc.dollarAmount + e.dollarAmount),
-    }),
-    { localCurrencyAmount: 0, dollarAmount: 0 },
-  );
-
-  // Per-person dollar totals for the totals bar
-  const perPerson: Record<string, number> = {};
-  for (const e of expensesWithTotals) {
-    if (e.responsible) {
-      perPerson[e.responsible] = round2((perPerson[e.responsible] ?? 0) + e.dollarAmount);
-    }
-  }
-  const personEntries = Object.entries(perPerson);
-  const maxPayer = personEntries.length
-    ? personEntries.reduce((a, b) => (a[1] > b[1] ? a : b))
-    : null;
-  const minPayer = personEntries.length > 1
-    ? personEntries.reduce((a, b) => (a[1] < b[1] ? a : b))
-    : null;
-  const diff = maxPayer && minPayer ? round2(maxPayer[1] - minPayer[1]) : 0;
+  const personEntries = Object.entries(totals.perPersonUsd || {});
 
   const doSync = async () => {
     try {
@@ -179,7 +178,7 @@ const ExpenseList: React.FC = () => {
       }
 
       showToast("BD actualizada desde Google Sheet.");
-      await loadExpenses(1);
+      await loadExpenses(1, selectedResponsible);
     } catch {
       showToast("Cannot connect with server. Please try again later.", true);
     }
@@ -188,7 +187,7 @@ const ExpenseList: React.FC = () => {
   const handleSyncClick = () => setConfirmOpen(true);
 
   const handleExpenseAddedWithSyncRefresh = () => {
-    handleAddExpense();
+    loadExpenses(1, selectedResponsible);
   };
 
   const renderCards = () => {
@@ -278,7 +277,7 @@ const ExpenseList: React.FC = () => {
           </StyledConfirmBox>
         </StyledConfirmBackdrop>
       )}
-
+      
       {/* ── HEADER ── */}
       <StyledPageHeader>
         <StyledHeaderInner>
@@ -305,31 +304,15 @@ const ExpenseList: React.FC = () => {
           </StyledHeaderTop>
 
           {!isViewingAllTrips && (
-            <StyledStatsRow>
-              <StyledStat>
-                <StyledStatLabel>Gastos</StyledStatLabel>
-                <StyledStatValue>{expensesWithTotals.length}</StyledStatValue>
-              </StyledStat>
-              <StyledStatDivider />
-              <StyledStat>
-                <StyledStatLabel>Total USD</StyledStatLabel>
-                <StyledStatValue $accent>U$D {formatAmount(totals.dollarAmount)}</StyledStatValue>
-              </StyledStat>
-              <StyledStatDivider />
-              <StyledStat>
-                <StyledStatLabel>Total Pesos</StyledStatLabel>
-                <StyledStatValue>$ {formatAmount(totals.localCurrencyAmount)}</StyledStatValue>
-              </StyledStat>
-              {selectedTrip && (
-                <>
-                  <StyledStatDivider />
-                  <StyledStat>
-                    <StyledStatLabel>Dólar</StyledStatLabel>
-                    <StyledStatValue>$ {formatAmount(selectedTrip.dolarPesosExchange)}</StyledStatValue>
-                  </StyledStat>
-                </>
-              )}
-            </StyledStatsRow>
+            <LazyExpenseStatsSummary
+              totalExpenses={totalCount || totalExpenses}
+              dollarTotal={totals.dollarTotal}
+              localCurrencyAmount={totals.localCurrencyAmount}
+              showDollarRate={Boolean(selectedTrip)}
+              dolarPesosExchange={selectedTrip?.dolarPesosExchange ?? 1}
+              formatAmount={formatAmount}
+              loading={loading}
+            />
           )}
           {isViewingAllTrips && (
             <StyledStatsRow>
@@ -385,28 +368,31 @@ const ExpenseList: React.FC = () => {
           <>
           {/* Totals bar */}
           <StyledTotalsBar>
-          <StyledTotalCard>
-            <StyledTotalCardLabel>Total USD</StyledTotalCardLabel>
-            <StyledTotalCardValue $color="#d4a853">U$D {formatAmount(totals.dollarAmount)}</StyledTotalCardValue>
-          </StyledTotalCard>
-          {personEntries.map(([name, usd]) => (
-            <StyledTotalCard key={name}>
-              <StyledTotalCardLabel>{name} pagó</StyledTotalCardLabel>
-              <StyledTotalCardValue $color={name.toLowerCase().startsWith("j") ? "#c4714a" : "#8a9e7e"}>
-                U$D {formatAmount(usd)}
-              </StyledTotalCardValue>
-            </StyledTotalCard>
-          ))}
-          {maxPayer && minPayer && (
             <StyledTotalCard>
-              <StyledTotalCardLabel>Diferencia</StyledTotalCardLabel>
-              <StyledTotalCardValue style={{ fontSize: "14px", lineHeight: "1.4" }}>
-                {minPayer[0]} le debe a {maxPayer[0]}<br />
-                <span style={{ fontSize: "20px", fontWeight: 500 }}>U$D {formatAmount(diff)}</span>
+              <StyledTotalCardLabel>Gastos en USD</StyledTotalCardLabel>
+              <StyledTotalCardValue $color="#d4a853">
+                {loading ? <StyledTotalValueSkeleton $width="108px" /> : <>U$D {formatAmount(totals.dollarTotal)}</>}
               </StyledTotalCardValue>
             </StyledTotalCard>
-          )}
-        </StyledTotalsBar>
+
+            {loading ? (
+              <StyledTotalCard>
+                <StyledTotalCardLabel>Pagó</StyledTotalCardLabel>
+                <StyledTotalCardValue>
+                  <StyledTotalValueSkeleton $width="92px" />
+                </StyledTotalCardValue>
+              </StyledTotalCard>
+            ) : (
+              personEntries.map(([name, data]) => (
+                <StyledTotalCard key={name}>
+                  <StyledTotalCardLabel>{name} pagó ({data.expenseCount})</StyledTotalCardLabel>
+                  <StyledTotalCardValue $color={name.toLowerCase().startsWith("j") ? "#c4714a" : "#8a9e7e"}>
+                    U$D {formatAmount(data.usdTotal)}
+                  </StyledTotalCardValue>
+                </StyledTotalCard>
+              ))
+            )}
+          </StyledTotalsBar>
 
         {/* Cards (mobile) */}
         {renderCards()}
@@ -430,11 +416,11 @@ const ExpenseList: React.FC = () => {
 
         {/* Pagination */}
         <StyledPaginationContainer>
-          <StyledPaginationButton disabled={!hasPrevPage} onClick={() => loadExpenses(currentPage - 1)}>
+          <StyledPaginationButton disabled={!hasPrevPage} onClick={() => loadExpenses(currentPage - 1, selectedResponsible)}>
             ← Anterior
           </StyledPaginationButton>
           <StyledPaginationInfo>Mostrando {expenses.length} gastos</StyledPaginationInfo>
-          <StyledPaginationButton disabled={!hasNextPage} onClick={() => loadExpenses(currentPage + 1)}>
+          <StyledPaginationButton disabled={!hasNextPage} onClick={() => loadExpenses(currentPage + 1, selectedResponsible)}>
             Siguiente →
           </StyledPaginationButton>
         </StyledPaginationContainer>

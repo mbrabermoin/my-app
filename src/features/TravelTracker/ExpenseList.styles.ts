@@ -259,6 +259,29 @@ export const StyledTotalCardValue = styled.div<{ $color?: string }>`
   }
 `;
 
+const totalValueShimmer = keyframes`
+  0% {
+    background-position: -180px 0;
+  }
+  100% {
+    background-position: 180px 0;
+  }
+`;
+
+export const StyledTotalValueSkeleton = styled.span<{ $width?: string }>`
+  display: inline-block;
+  width: ${(p) => p.$width ?? "92px"};
+  height: 20px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.14) 20%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.14) 80%);
+  background-size: 300px 100%;
+  animation: ${totalValueShimmer} 1.1s linear infinite;
+
+  @media (min-width: 640px) {
+    height: 24px;
+  }
+`;
+
 /* ── TABLE ── */
 export const StyledTableWrap = styled.div`
   display: none;

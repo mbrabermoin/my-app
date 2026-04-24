@@ -128,46 +128,287 @@ const getTrips = async (req, res) => {
 const getExpenses = async (req, res) => {
   console.log('[DEBUG] getExpenses called');
   try {
-    const { page, limit, travelId } = req.query;
+    const { page, limit, travelId, responsible } = req.query;
     let hasLimit = limit !== undefined;
 
-    let query = "SELECT id, type, amount, responsible, paymentMethod, travelId, travelDescription, exchange, date FROM expenses";
-    let countQuery = "SELECT COUNT(*) FROM expenses";
+    let query = `SELECT
+      e.id,
+      e.type,
+      e.amount,
+      e.responsible,
+      e.paymentMethod,
+      e.travelId,
+      e.travelDescription,
+      e.exchange,
+      e.date,
+      ROUND(
+        CASE
+          WHEN LOWER(TRIM(e.exchange)) IN ('peso', 'pesos', 'ars') THEN
+            e.amount / NULLIF(
+              COALESCE(
+                (to_jsonb(t) ->> 'dolarPesosExchange')::numeric,
+                (to_jsonb(t) ->> 'dolarpesosexchange')::numeric,
+                1
+              ),
+              0
+            )
+          WHEN LOWER(TRIM(e.exchange)) IN ('real', 'reales', 'brl') THEN
+            e.amount / NULLIF(
+              COALESCE(
+                (to_jsonb(t) ->> 'dolarRealExchange')::numeric,
+                (to_jsonb(t) ->> 'dolarrealexchange')::numeric,
+                1
+              ),
+              0
+            )
+          ELSE e.amount
+        END,
+        2
+      ) AS "dollarAmount"
+    FROM expenses e
+    LEFT JOIN trips t ON t.id::text = e.travelId::text`;
+    let countQuery = "SELECT COUNT(*) FROM expenses e";
+    let perPersonQuery = `SELECT
+      e.responsible,
+      COUNT(*) AS "expenseCount",
+      ROUND(
+        COALESCE(
+          SUM(
+            CASE
+              WHEN LOWER(TRIM(e.exchange)) IN ('peso', 'pesos', 'ars') THEN
+                e.amount / NULLIF(
+                  COALESCE(
+                    (to_jsonb(t) ->> 'dolarPesosExchange')::numeric,
+                    (to_jsonb(t) ->> 'dolarpesosexchange')::numeric,
+                    1
+                  ),
+                  0
+                )
+              WHEN LOWER(TRIM(e.exchange)) IN ('real', 'reales', 'brl') THEN
+                e.amount / NULLIF(
+                  COALESCE(
+                    (to_jsonb(t) ->> 'dolarRealExchange')::numeric,
+                    (to_jsonb(t) ->> 'dolarrealexchange')::numeric,
+                    1
+                  ),
+                  0
+                )
+              WHEN LOWER(TRIM(e.exchange)) IN ('dolar', 'dólar', 'dolares', 'dólares', 'usd') THEN e.amount
+              ELSE 0
+            END
+          ),
+          0
+        ),
+        2
+      ) AS "usdTotal"
+    FROM expenses e
+    LEFT JOIN trips t ON t.id::text = e.travelId::text`;
+    let totalsQuery = `SELECT
+      ROUND(
+        COALESCE(
+          SUM(
+            CASE
+              WHEN LOWER(TRIM(e.exchange)) IN ('dolar', 'dólar', 'dolares', 'dólares', 'usd') THEN e.amount
+              ELSE 0
+            END
+          ),
+          0
+        ),
+        2
+      ) AS "dollarPaid",
+      ROUND(
+        COALESCE(
+          SUM(
+            CASE
+              WHEN LOWER(TRIM(e.exchange)) IN ('peso', 'pesos', 'ars') THEN e.amount
+              ELSE 0
+            END
+          ),
+          0
+        ),
+        2
+      ) AS "pesosPaid",
+      ROUND(
+        COALESCE(
+          SUM(
+            CASE
+              WHEN LOWER(TRIM(e.exchange)) IN ('real', 'reales', 'brl') THEN e.amount
+              ELSE 0
+            END
+          ),
+          0
+        ),
+        2
+      ) AS "realesPaid",
+      ROUND(
+        COALESCE(
+          SUM(
+            CASE
+              WHEN LOWER(TRIM(e.exchange)) IN ('peso', 'pesos', 'ars') THEN
+                e.amount / NULLIF(
+                  COALESCE(
+                    (to_jsonb(t) ->> 'dolarPesosExchange')::numeric,
+                    (to_jsonb(t) ->> 'dolarpesosexchange')::numeric,
+                    1
+                  ),
+                  0
+                )
+              WHEN LOWER(TRIM(e.exchange)) IN ('real', 'reales', 'brl') THEN
+                e.amount / NULLIF(
+                  COALESCE(
+                    (to_jsonb(t) ->> 'dolarRealExchange')::numeric,
+                    (to_jsonb(t) ->> 'dolarrealexchange')::numeric,
+                    1
+                  ),
+                  0
+                )
+              WHEN LOWER(TRIM(e.exchange)) IN ('dolar', 'dólar', 'dolares', 'dólares', 'usd') THEN e.amount
+              ELSE 0
+            END
+          ),
+          0
+        ),
+        2
+      ) AS "dollarTotal",
+      ROUND(
+        COALESCE(
+          SUM(
+            CASE
+              WHEN LOWER(TRIM(e.exchange)) IN ('peso', 'pesos', 'ars') THEN e.amount
+              WHEN LOWER(TRIM(e.exchange)) IN ('real', 'reales', 'brl') THEN
+                (e.amount / NULLIF(
+                  COALESCE(
+                    (to_jsonb(t) ->> 'dolarRealExchange')::numeric,
+                    (to_jsonb(t) ->> 'dolarrealexchange')::numeric,
+                    1
+                  ),
+                  0
+                )) * NULLIF(
+                  COALESCE(
+                    (to_jsonb(t) ->> 'dolarPesosExchange')::numeric,
+                    (to_jsonb(t) ->> 'dolarpesosexchange')::numeric,
+                    1
+                  ),
+                  0
+                )
+              WHEN LOWER(TRIM(e.exchange)) IN ('dolar', 'dólar', 'dolares', 'dólares', 'usd') THEN
+                e.amount * NULLIF(
+                  COALESCE(
+                    (to_jsonb(t) ->> 'dolarPesosExchange')::numeric,
+                    (to_jsonb(t) ->> 'dolarpesosexchange')::numeric,
+                    1
+                  ),
+                  0
+                )
+              ELSE 0
+            END
+          ),
+          0
+        ),
+        2
+      ) AS "localCurrencyAmount"
+    FROM expenses e
+    LEFT JOIN trips t ON t.id::text = e.travelId::text`;
     let params = [];
     let countParams = [];
-    let paramIndex = 1;
-    const whereClauses = ["LOWER(TRIM(responsible)) IN ('mati', 'juli')"];
+    let totalsParams = [];
+    let perPersonParams = [];
+
+    const mainWhere = ["LOWER(TRIM(e.responsible)) IN ('mati', 'juli')"];
+    const countWhere = ["LOWER(TRIM(e.responsible)) IN ('mati', 'juli')"];
+    const totalsWhere = ["LOWER(TRIM(e.responsible)) IN ('mati', 'juli')"];
+    const perPersonWhere = ["LOWER(TRIM(e.responsible)) IN ('mati', 'juli')"];
 
     if (travelId) {
-      whereClauses.push("travelId = $" + paramIndex);
+      mainWhere.push("e.travelId = $" + (params.length + 1));
       params.push(travelId);
+
+      countWhere.push("e.travelId = $" + (countParams.length + 1));
       countParams.push(travelId);
-      paramIndex++;
+
+      totalsWhere.push("e.travelId = $" + (totalsParams.length + 1));
+      totalsParams.push(travelId);
+
+      perPersonWhere.push("e.travelId = $" + (perPersonParams.length + 1));
+      perPersonParams.push(travelId);
     }
 
-    if (whereClauses.length > 0) {
-      query += " WHERE " + whereClauses.join(" AND ");
-      countQuery += " WHERE " + whereClauses
-        .map((clause, index) => (index === 0 ? clause : "travelId = $1"))
-        .join(" AND ");
+    const normalizedResponsible = String(responsible || "").trim().toLowerCase();
+    if (normalizedResponsible) {
+      // Apply responsible filter ONLY to main list and count (not to totals/perPerson to show general totals)
+      mainWhere.push("LOWER(TRIM(e.responsible)) = $" + (params.length + 1));
+      params.push(normalizedResponsible);
+
+      countWhere.push("LOWER(TRIM(e.responsible)) = $" + (countParams.length + 1));
+      countParams.push(normalizedResponsible);
     }
 
-    query += " ORDER BY id ASC";
+    if (mainWhere.length > 0) {
+      query += " WHERE " + mainWhere.join(" AND ");
+      countQuery += " WHERE " + countWhere.join(" AND ");
+      totalsQuery += " WHERE " + totalsWhere.join(" AND ");
+      perPersonQuery += " WHERE " + perPersonWhere.join(" AND ");
+    }
+
+    query += " ORDER BY e.id ASC";
+    perPersonQuery += " GROUP BY e.responsible ORDER BY e.responsible ASC";
     
     if (hasLimit) {
       const pageNum = parseInt(page) || 1;
       const limitNum = parseInt(limit);
       const offset = (pageNum - 1) * limitNum;
-      query += " LIMIT $" + paramIndex + " OFFSET $" + (paramIndex + 1);
+      query += " LIMIT $" + (params.length + 1) + " OFFSET $" + (params.length + 2);
       params.push(limitNum, offset);
     }
 
     const result = await pool.query(query, params);
     const countResult = await pool.query(countQuery, countParams);
+    
+    // Get total count without responsible filter (for display purposes)
+    let totalCountQuery = "SELECT COUNT(*) FROM expenses e";
+    let totalCountParams = [];
+    const totalCountWhere = [];
+    if (travelId) {
+      totalCountWhere.push("e.travelId = $1");
+      totalCountParams.push(travelId);
+    } else {
+      totalCountWhere.push("LOWER(TRIM(e.responsible)) IN ('mati', 'juli')");
+    }
+    if (totalCountWhere.length > 0) {
+      totalCountQuery += " WHERE " + totalCountWhere.join(" AND ");
+    }
+    const totalCountResult = await pool.query(totalCountQuery, totalCountParams);
+    
+    const totalsResult = await pool.query(totalsQuery, totalsParams);
+    const perPersonResult = await pool.query(perPersonQuery, perPersonParams);
     const totalExpenses = Number.parseInt(countResult.rows[0].count);
+    const totalCount = Number.parseInt(totalCountResult.rows[0].count);
+    const totalsRow = totalsResult.rows[0] || {
+      dollarPaid: 0,
+      pesosPaid: 0,
+      realesPaid: 0,
+      dollarTotal: 0,
+      localCurrencyAmount: 0,
+    };
+    const totals = {
+      dollarPaid: Number.parseFloat(totalsRow.dollarPaid) || 0,
+      pesosPaid: Number.parseFloat(totalsRow.pesosPaid) || 0,
+      realesPaid: Number.parseFloat(totalsRow.realesPaid) || 0,
+      dollarTotal: Number.parseFloat(totalsRow.dollarTotal) || 0,
+      localCurrencyAmount: Number.parseFloat(totalsRow.localCurrencyAmount) || 0,
+      perPersonUsd: Object.fromEntries(
+        perPersonResult.rows
+          .filter((row) => row.responsible)
+          .map((row) => [String(row.responsible), {
+            usdTotal: Number.parseFloat(row.usdTotal) || 0,
+            expenseCount: Number.parseInt(row.expenseCount) || 0
+          }]),
+      ),
+    };
 
     let responseData = {
       expenses: result.rows,
+      totals,
     };
     
     if (hasLimit) {
@@ -178,6 +419,7 @@ const getExpenses = async (req, res) => {
         currentPage: pageNum,
         totalPages,
         totalExpenses,
+        totalCount,
         hasNextPage: pageNum < totalPages,
         hasPrevPage: pageNum > 1,
       };

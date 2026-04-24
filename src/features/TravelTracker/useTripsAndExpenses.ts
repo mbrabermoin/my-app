@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { apiUrl } from "../../lib/api";
 
 interface Trip {
@@ -15,6 +15,7 @@ interface Expense {
   id: number;
   type: string;
   amount: number;
+  dollarAmount: number;
   date: string;
   category: string;
   travelId: string;
@@ -27,6 +28,7 @@ interface ExpenseApiItem {
   id?: number;
   type?: string;
   amount?: number | string;
+  dollarAmount?: number | string;
   date?: string;
   category?: string;
   travelId?: string | number;
@@ -40,9 +42,19 @@ interface ExpenseApiItem {
 interface PaginationParams {
   totalPages: number;
   totalExpenses: number;
+  totalCount: number;
   currentPage: number;
   hasNextPage: boolean;
   hasPrevPage: boolean;
+}
+
+interface ExpenseTotals {
+  dollarTotal: number;
+  localCurrencyAmount: number;
+  dollarPaid: number;
+  pesosPaid: number;
+  realesPaid: number;
+  perPersonUsd: Record<string, { usdTotal: number; expenseCount: number }>;
 }
 
 export const useTripsAndExpenses = () => {
@@ -53,9 +65,18 @@ export const useTripsAndExpenses = () => {
   const [pagination, setPagination] = useState<PaginationParams>({
     totalPages: 0,
     totalExpenses: 0,
+    totalCount: 0,
     currentPage: 1,
     hasNextPage: false,
     hasPrevPage: false,
+  });
+  const [allExpensesTotals, setAllExpensesTotals] = useState<ExpenseTotals>({
+    dollarTotal: 0,
+    localCurrencyAmount: 0,
+    dollarPaid: 0,
+    pesosPaid: 0,
+    realesPaid: 0,
+    perPersonUsd: {},
   });
 
   useEffect(() => {
@@ -85,12 +106,23 @@ export const useTripsAndExpenses = () => {
     }
   };
 
-  const loadExpenses = async (currentPage: number) => {
+  const loadExpenses = useCallback(async (currentPage: number, responsible?: string | null) => {
     try {
       setLoading(true);
+      // Clear previous page data so stale totals are not rendered while loading.
+      setExpenses([]);
+      setAllExpensesTotals({
+        dollarTotal: 0,
+        localCurrencyAmount: 0,
+        dollarPaid: 0,
+        pesosPaid: 0,
+        realesPaid: 0,
+        perPersonUsd: {},
+      });
+      const responsibleQuery = responsible ? `&responsible=${encodeURIComponent(responsible)}` : "";
       const url = selectedTrip
-        ? apiUrl(`/api/expenses?page=${currentPage}&limit=50&travelId=${selectedTrip.id}`)
-        : apiUrl("/api/expenses");
+        ? apiUrl(`/api/expenses?page=${currentPage}&limit=50&travelId=${selectedTrip.id}${responsibleQuery}`)
+        : apiUrl(`/api/expenses?page=${currentPage}&limit=50${responsibleQuery}`);
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -102,6 +134,7 @@ export const useTripsAndExpenses = () => {
         id: Number(item.id || 0),
         type: String(item.type || ""),
         amount: Number(item.amount || 0),
+        dollarAmount: Number(item.dollarAmount || 0),
         date: String(item.date || ""),
         category: String(item.category || ""),
         travelId: String(item.travelId ?? item.travelid ?? ""),
@@ -111,6 +144,15 @@ export const useTripsAndExpenses = () => {
       }));
 
       setExpenses(normalizedExpenses);
+      
+      setAllExpensesTotals({
+        dollarTotal: Number(data.data?.totals?.dollarTotal || 0),
+        localCurrencyAmount: Number(data.data?.totals?.localCurrencyAmount || 0),
+        dollarPaid: Number(data.data?.totals?.dollarPaid || 0),
+        pesosPaid: Number(data.data?.totals?.pesosPaid || 0),
+        realesPaid: Number(data.data?.totals?.realesPaid || 0),
+        perPersonUsd: data.data?.totals?.perPersonUsd || {},
+      });
 
       if (data.data.pagination) {
         setPagination(data.data.pagination);
@@ -118,6 +160,7 @@ export const useTripsAndExpenses = () => {
         setPagination({
           totalPages: 1,
           totalExpenses: normalizedExpenses.length,
+          totalCount: normalizedExpenses.length,
           currentPage: 1,
           hasNextPage: false,
           hasPrevPage: false,
@@ -126,10 +169,18 @@ export const useTripsAndExpenses = () => {
     } catch (error) {
       console.error("❌ Error loading expenses:", error);
       setExpenses([]);
+      setAllExpensesTotals({
+        dollarTotal: 0,
+        localCurrencyAmount: 0,
+        dollarPaid: 0,
+        pesosPaid: 0,
+        realesPaid: 0,
+        perPersonUsd: {},
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedTrip]);
 
   const handleAddExpense = () => {
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
@@ -145,5 +196,6 @@ export const useTripsAndExpenses = () => {
     pagination,
     loadExpenses,
     handleAddExpense,
+    allExpensesTotals,
   };
 };
