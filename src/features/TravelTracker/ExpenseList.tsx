@@ -290,7 +290,6 @@ const ExpenseList: React.FC = () => {
                   {selectedTrip.destiny} · {formatTripDate(selectedTrip.startDate)} – {formatTripDate(selectedTrip.endDate)}
                 </p>
               )}
-              <p>Fuente de verdad: Google Sheet</p>
             </StyledTitleGroup>
             <StyledHeaderActions>
               <StyledBackButton onClick={() => router.push("/")}>← Volver</StyledBackButton>
