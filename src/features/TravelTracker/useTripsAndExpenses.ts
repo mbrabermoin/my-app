@@ -122,7 +122,7 @@ export const useTripsAndExpenses = () => {
       const responsibleQuery = responsible ? `&responsible=${encodeURIComponent(responsible)}` : "";
       const url = selectedTrip
         ? apiUrl(`/api/expenses?page=${currentPage}&limit=50&travelId=${selectedTrip.id}${responsibleQuery}`)
-        : apiUrl(`/api/expenses?page=${currentPage}&limit=50${responsibleQuery}`);
+        : apiUrl(`/api/expenses`);
       const response = await fetch(url);
 
       if (!response.ok) {
