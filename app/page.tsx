@@ -11,6 +11,11 @@ const actions = [
     title: "Trip Tracker",
     copy: "Explore expenses, filter by trip, and sync with Google Sheets.",
   },
+  {
+    href: "/puertasAbiertas",
+    title: "Puertas Abiertas",
+    copy: "Compra y venta de objetos en desuso.",
+  },
 ];
 
 export default function HomePage() {
