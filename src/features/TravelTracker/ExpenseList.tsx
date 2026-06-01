@@ -338,7 +338,7 @@ const ExpenseList: React.FC = () => {
                 $active={selectedTrip?.id === trip.id}
                 onClick={() => setSelectedTrip(trip)}
               >
-                {trip.destiny}
+                {trip.destiny} - {trip.year}
               </StyledChip>
             ))}
           </StyledTripFilterContainer>

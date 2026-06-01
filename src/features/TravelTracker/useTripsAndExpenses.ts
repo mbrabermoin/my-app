@@ -9,6 +9,8 @@ interface Trip {
   startDate: string | Date;
   endDate: string | Date;
   paidBy: string;
+  year: number;
+  month: number;
 }
 
 interface Expense {
