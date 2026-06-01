@@ -161,6 +161,78 @@ export const StyledTripFilterContainer = styled.div`
   flex-wrap: wrap;
 `;
 
+export const StyledTripSelectWrap = styled.div`
+  position: relative;
+  min-width: min(100%, 360px);
+  max-width: 100%;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #fffdf9 0%, #f8eee2 100%);
+  border: 1px solid rgba(107,66,38,0.14);
+  box-shadow: 0 8px 22px rgba(26,20,16,0.08);
+  overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+
+  &:hover {
+    border-color: rgba(107,66,38,0.28);
+    box-shadow: 0 12px 26px rgba(26,20,16,0.12);
+    transform: translateY(-1px);
+  }
+
+  &:focus-within {
+    border-color: ${terracotta};
+    box-shadow: 0 0 0 3px rgba(196,113,74,0.2), 0 14px 28px rgba(26,20,16,0.12);
+    transform: translateY(-1px);
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    right: 16px;
+    top: calc(50% - 8px);
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid ${warmBrown};
+    border-bottom: 2px solid ${warmBrown};
+    transform: rotate(45deg);
+    pointer-events: none;
+  }
+
+  @media (max-width: 640px) {
+    min-width: 100%;
+  }
+`;
+
+export const StyledTripSelect = styled.select`
+  width: 100%;
+  appearance: none;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: ${deep};
+  padding: 12px 40px 12px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  text-wrap: pretty;
+
+  option {
+    font-weight: 500;
+    color: ${deep};
+    background: #fffdfa;
+  }
+
+  &:hover {
+    color: ${warmBrown};
+  }
+
+  &:focus {
+    outline: none;
+    color: ${deep};
+  }
+`;
+
 export const StyledFilterLabel = styled.span`
   font-size: 11px;
   text-transform: uppercase;

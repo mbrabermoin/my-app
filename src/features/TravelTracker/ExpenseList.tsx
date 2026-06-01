@@ -23,6 +23,8 @@ import {
   StyledFiltersSection,
   StyledFiltersInner,
   StyledTripFilterContainer,
+  StyledTripSelectWrap,
+  StyledTripSelect,
   StyledFilterLabel,
   StyledChip,
   StyledMain,
@@ -116,6 +118,43 @@ const ExpenseList: React.FC = () => {
     const d = date instanceof Date ? date : new Date(date);
     if (Number.isNaN(d.getTime())) return "-";
     return d.toLocaleDateString("es-AR", { timeZone: "UTC" });
+  };
+
+  const formatTripMonthYear = (trip: {
+    startDate?: string | Date;
+    month?: string;
+    year?: number;
+  }) => {
+    if (trip.startDate) {
+      const d = trip.startDate instanceof Date ? trip.startDate : new Date(trip.startDate);
+      if (!Number.isNaN(d.getTime())) {
+        return new Intl.DateTimeFormat("es-AR", {
+          month: "long",
+          year: "numeric",
+          timeZone: "UTC",
+        }).format(d);
+      }
+    }
+
+    if (trip.month && trip.year) {
+      return `${trip.month} ${trip.year}`;
+    }
+
+    if (trip.year) {
+      return String(trip.year);
+    }
+
+    return "";
+  };
+
+  const formatTripFilterLabel = (trip: {
+    destiny: string;
+    startDate?: string | Date;
+    month?: string;
+    year?: number;
+  }) => {
+    const monthYear = formatTripMonthYear(trip);
+    return monthYear ? `${trip.destiny} - ${monthYear}` : trip.destiny;
   };
 
   const normalizeExchange = (v: string) =>
@@ -329,18 +368,29 @@ const ExpenseList: React.FC = () => {
         <StyledFiltersInner>
           <StyledTripFilterContainer>
             <StyledFilterLabel>Viaje</StyledFilterLabel>
-            <StyledChip $active={selectedTrip === null} onClick={() => setSelectedTrip(null)}>
-              Todos
-            </StyledChip>
-            {trips.map((trip) => (
-              <StyledChip
-                key={trip.id}
-                $active={selectedTrip?.id === trip.id}
-                onClick={() => setSelectedTrip(trip)}
+            <StyledTripSelectWrap>
+              <StyledTripSelect
+                aria-label="Seleccionar viaje"
+                value={selectedTrip ? String(selectedTrip.id) : "all"}
+                onChange={(event) => {
+                  const selectedId = event.target.value;
+                  if (selectedId === "all") {
+                    setSelectedTrip(null);
+                    return;
+                  }
+
+                  const trip = trips.find((item) => String(item.id) === selectedId) ?? null;
+                  setSelectedTrip(trip);
+                }}
               >
-                {trip.destiny} - {trip.year}
-              </StyledChip>
-            ))}
+                <option value="all">Todos los viajes</option>
+                {trips.map((trip) => (
+                  <option key={trip.id} value={String(trip.id)}>
+                    {formatTripFilterLabel(trip)}
+                  </option>
+                ))}
+              </StyledTripSelect>
+            </StyledTripSelectWrap>
           </StyledTripFilterContainer>
 
           {!isViewingAllTrips && (
