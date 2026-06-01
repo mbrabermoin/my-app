@@ -10,7 +10,7 @@ interface Trip {
   endDate: string | Date;
   paidBy: string;
   year: number;
-  month: number;
+  month: string;
 }
 
 interface Expense {

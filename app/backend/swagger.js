@@ -47,6 +47,8 @@ const options = {
             startDate: { type: 'string', format: 'date-time' },
             endDate: { type: 'string', format: 'date-time' },
             paidBy: { type: 'string' },
+            year: { type: 'integer' },
+            month: { type: 'string' },
           },
         },
       },

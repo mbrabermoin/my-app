@@ -143,7 +143,7 @@ async function importSheet() {
         startDate TIMESTAMP,
         endDate TIMESTAMP,
         year INT,
-        month INT
+        month VARCHAR(50)
       );
     `);
 
