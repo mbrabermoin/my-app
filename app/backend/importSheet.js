@@ -170,7 +170,7 @@ async function importSheet() {
 
       await db.query(
         `INSERT INTO public.trips (id, destiny, sheetTab, dolarRealExchange, dolarPesosExchange, startDate, endDate, year, month) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [tripId, destiny, sheetTab || destiny, cleanAmount(exchangeRealDollar || "0"), cleanAmount(exchangePesosDollar || "0"), parseDate(startDate), parseDate(endDate), parseInt(year) || null, parseInt(month) || null]
+        [tripId, destiny, sheetTab || destiny, cleanAmount(exchangeRealDollar || "0"), cleanAmount(exchangePesosDollar || "0"), parseDate(startDate), parseDate(endDate), parseInt(year) || null, month]
       );
       summary.tripsImported += 1;
     }
